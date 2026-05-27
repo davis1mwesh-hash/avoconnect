@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import FarmDiary from "./FarmDiary";
 
@@ -33,24 +33,176 @@ const css = `
   .serif { font-family: 'Playfair Display', serif; }
   ::placeholder { color: #A8A39A; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: ${t.green} !important; box-shadow: 0 0 0 3px rgba(45,122,79,.1); }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
 `;
 
 const COUNTIES = ["Nakuru","Nairobi","Kiambu","Murang'a","Nyeri","Meru","Kirinyaga","Embu","Kisii","Bomet","Nandi","Uasin Gishu"];
 const VARIETIES = ["Hass","Fuerte","Jumbo","Pinkerton","Reed","Kienyeji"];
 const BUYER_TYPES = ["Local trader","Packhouse","Exporter","Supermarket","International importer"];
 const STATUS_COLORS = {
-  pending: { bg: "#FEF3C7", text: "#92400E" },
-  accepted: { bg: "#D1FAE5", text: "#065F46" },
-  rejected: { bg: "#FEE2E2", text: "#991B1B" },
+  pending:   { bg: "#FEF3C7", text: "#92400E" },
+  accepted:  { bg: "#D1FAE5", text: "#065F46" },
+  rejected:  { bg: "#FEE2E2", text: "#991B1B" },
   completed: { bg: "#E0E7FF", text: "#3730A3" },
 };
 
 const inp = { width: "100%", padding: "11px 14px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 14, background: t.white, color: t.text, transition: "border .15s, box-shadow .15s" };
 const btn = (bg, color, border) => ({ padding: "11px 24px", background: bg, color, border: border || "none", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", transition: "opacity .15s" });
 
+// ── Notification Bell ─────────────────────────────────────────
+function NotificationBell({ profile }) {
+  const [notifications, setNotifications] = useState([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  const unread = notifications.filter(n => !n.is_read).length;
+
+  useEffect(() => {
+    if (!profile) return;
+    loadNotifications();
+
+    // Real-time: listen for new notifications for this user
+    const channel = supabase
+      .channel("notifications:" + profile.id)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${profile.id}`,
+      }, (payload) => {
+        setNotifications(prev => [payload.new, ...prev]);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [profile]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  async function loadNotifications() {
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setNotifications(data || []);
+  }
+
+  async function markAllRead() {
+    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+    if (!unreadIds.length) return;
+    await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  }
+
+  async function markOneRead(id) {
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  }
+
+  function timeAgo(ts) {
+    const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  const typeIcon = (type) => ({ order: "📦", accepted: "✅", rejected: "❌", completed: "🎉" }[type] || "🔔");
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Bell button */}
+      <button
+        onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
+        style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
+      >
+        🔔
+        {unread > 0 && (
+          <span style={{
+            position: "absolute", top: -4, right: -4,
+            background: "#EF4444", color: "#fff",
+            fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
+            borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 4px", border: `2px solid ${t.white}`,
+            animation: "pulse 1.5s ease-in-out 3",
+          }}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 10px)", right: 0,
+          width: 340, background: t.white, border: `1px solid ${t.border}`,
+          borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,0.14)",
+          zIndex: 999, animation: "slideDown .15s ease",
+          maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
+            {unread > 0 && (
+              <button onClick={markAllRead} style={{ fontSize: 12, color: t.green, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+                <p style={{ fontSize: 13, color: t.textMuted }}>No notifications yet</p>
+              </div>
+            ) : notifications.map(n => (
+              <div
+                key={n.id}
+                onClick={() => markOneRead(n.id)}
+                style={{
+                  padding: "14px 18px",
+                  borderBottom: `1px solid ${t.border}`,
+                  background: n.is_read ? t.white : t.greenLight,
+                  cursor: "default",
+                  transition: "background .2s",
+                }}
+              >
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>
+                      {n.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                  {!n.is_read && (
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.green, flexShrink: 0, marginTop: 4 }} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Nav ──────────────────────────────────────────────────────
 function Nav({ setPage, profile, onSignOut }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <nav style={{ background: t.white, borderBottom: `1px solid ${t.border}`, padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 62, position: "sticky", top: 0, zIndex: 100, boxShadow: t.shadow }}>
       <div onClick={() => setPage("home")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
@@ -75,7 +227,12 @@ function Nav({ setPage, profile, onSignOut }) {
                 <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
               </>
             )}
-            <button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
+            {/* 🔔 Notification Bell — shows for both farmers and buyers */}
+            <NotificationBell profile={profile} />
+            {profile?.email === "davidgichovi@gmail.com" && (
+  <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
+)}
+<button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
           </>
         ) : (
           <>
@@ -211,6 +368,9 @@ function ListingDetail({ listing: l, setPage, profile }) {
   async function placeOrder() {
     if (!profile) { setPage("signup"); return; }
     setLoading(true);
+    const { data: buyerProfile } = await supabase.from("profiles").select("suspended, verified").eq("id", profile.id).single();
+    if (buyerProfile?.suspended) { setError("Your account is suspended due to no-shows. Contact support."); setLoading(false); return; }
+    if (!buyerProfile?.verified) { setError("Your account is pending verification. You can place orders once approved."); setLoading(false); return; }
     const { error } = await supabase.from("orders").insert({
       listing_id: l.id, farmer_id: l.farmer_id, buyer_id: profile.id,
       quantity_kg: qty, price_per_kg: l.price_per_kg, message: msg,
@@ -309,9 +469,68 @@ function FarmerDashboard({ setPage, profile }) {
     setListings(prev => prev.map(l => l.id === listing.id ? { ...l, is_active: !l.is_active } : l));
   }
 
+  // ── Core: accept/reject order + deduct listing + notify buyer ──
   async function updateOrderStatus(orderId, status) {
+    // 1. Find the order
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // 2. Update order status
     await supabase.from("orders").update({ status }).eq("id", orderId);
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+
+    // 3. If ACCEPTED → deduct quantity from listing
+    if (status === "accepted") {
+      const listing = listings.find(l => l.id === order.listing_id);
+      if (listing) {
+        const remaining = (listing.quantity_kg || 0) - (order.quantity_kg || 0);
+        const shouldDeactivate = remaining <= 0;
+        const newQty = Math.max(0, remaining);
+
+        await supabase.from("listings").update({
+          quantity_kg: newQty,
+          is_active: !shouldDeactivate,
+        }).eq("id", listing.id);
+
+        setListings(prev => prev.map(l =>
+          l.id === listing.id
+            ? { ...l, quantity_kg: newQty, is_active: !shouldDeactivate }
+            : l
+        ));
+      }
+
+      // 4. Notify buyer — order accepted
+      const varietyName = order.listings?.variety || "avocados";
+      const totalKsh = (order.quantity_kg * order.price_per_kg).toLocaleString();
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id,
+        type: "accepted",
+        title: "Order accepted! ✅",
+        message: `${profile.name} accepted your order for ${order.quantity_kg} kg of ${varietyName} (Ksh ${totalKsh}). They will contact you shortly.`,
+      });
+    }
+
+    // 5. If REJECTED → notify buyer
+    if (status === "rejected") {
+      const varietyName = order.listings?.variety || "avocados";
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id,
+        type: "rejected",
+        title: "Order declined ❌",
+        message: `${profile.name} was unable to fulfil your order for ${order.quantity_kg} kg of ${varietyName}. You can browse other listings on the marketplace.`,
+      });
+    }
+
+    // 6. If COMPLETED → notify buyer
+    if (status === "completed") {
+      const varietyName = order.listings?.variety || "avocados";
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id,
+        type: "completed",
+        title: "Order completed 🎉",
+        message: `Your order of ${order.quantity_kg} kg of ${varietyName} from ${profile.name} has been marked as completed. Thank you for trading on AvoConnect!`,
+      });
+    }
   }
 
   async function saveEdit() {
@@ -405,6 +624,10 @@ function FarmerDashboard({ setPage, profile }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 10px", borderRadius: 99, fontWeight: 500 }}>{l.variety}</span>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? "#D1FAE5" : "#F3F4F6", color: l.is_active ? "#065F46" : t.textMuted }}>{l.is_active ? "● Active" : "● Hidden"}</span>
+                    {/* Show sold-out badge if qty is 0 */}
+                    {l.quantity_kg === 0 && (
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{l.quantity_kg?.toLocaleString()} kg · Ksh {l.price_per_kg}/kg</div>
                   <div style={{ fontSize: 12, color: t.textMuted }}>Harvest: {l.harvest_date} · {l.certification}</div>
@@ -440,8 +663,25 @@ function FarmerDashboard({ setPage, profile }) {
                   <button onClick={() => updateOrderStatus(o.id, "accepted")} style={{ ...btn(t.green, t.white), flex: 2, padding: "9px" }}>Accept order ✓</button>
                 </div>
               )}
+              {o.status === "accepted" && o.expires_at && (() => {
+                const remaining = Math.max(0, new Date(o.expires_at) - Date.now());
+                const hrs = Math.floor(remaining / 3600000);
+                const mins = Math.floor((remaining % 3600000) / 60000);
+                return remaining > 0 ? (
+                  <div style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
+                    ⏱ Buyer has {hrs}h {mins}m to confirm pickup
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#991B1B", background: "#FEE2E2", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
+                    ⛔ Order expired — mark as no-show if buyer didn't arrive
+                  </div>
+                );
+              })()}
               {o.status === "accepted" && (
-                <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), width: "100%", padding: "9px" }}>Mark as completed</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => updateOrderStatus(o.id, "no_show")} style={{ ...btn("none", "#F59E0B", "1px solid #FCD34D"), flex: 1, padding: "9px", fontSize: 13 }}>⚠️ No-show</button>
+                  <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), flex: 2, padding: "9px" }}>✓ Mark completed</button>
+                </div>
               )}
             </div>
           ))
@@ -658,6 +898,7 @@ export default function App() {
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
+{pageName === "admin" && profile?.email === "davidgichovi@gmail.com" && <AdminPage profile={profile} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
       </div>
     </>
