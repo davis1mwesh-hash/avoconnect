@@ -444,6 +444,11 @@ function ListingDetail({ listing: l, setPage, profile }) {
 // ── Farmer Dashboard ─────────────────────────────────────────
 function FarmerDashboard({ setPage, profile }) {
   const [tab, setTab] = useState("listings");
+  const [, forceUpdate] = useState(0);
+useEffect(() => {
+  const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
+  return () => clearInterval(interval);
+}, []);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
