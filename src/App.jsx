@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import FarmDiary from "./FarmDiary";
+import AdminPage from "./AdminPage";
+import ReviewModal from "./ReviewModal";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
