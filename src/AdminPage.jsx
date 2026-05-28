@@ -1,0 +1,547 @@
+import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+const t = {
+  green: "#2D7A4F", greenDark: "#1A5C35", greenLight: "#EAF4EE",
+  brown: "#6B4C2A", brownLight: "#F5EFE6",
+  cream: "#FDFAF5", white: "#FFFFFF",
+  text: "#1C1C1A", textMuted: "#6B6B5F", border: "#E2DDD6",
+  shadow: "0 2px 12px rgba(0,0,0,.06)",
+  red: "#EF4444", redLight: "#FEE2E2",
+  amber: "#F59E0B", amberLight: "#FEF3C7",
+  blue: "#3B82F6", blueLight: "#DBEAFE",
+  purple: "#8B5CF6", purpleLight: "#EDE9FE",
+};
+
+const btn = (bg, color, border) => ({
+  padding: "9px 20px", background: bg, color, border: border || "none",
+  borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer",
+  fontFamily: "Inter, sans-serif", transition: "opacity .15s",
+});
+
+const TABS = [
+  { key: "pending",   label: "⏳ Pending",    color: t.amber },
+  { key: "users",     label: "👥 All Users",   color: t.blue },
+  { key: "no_shows",  label: "⚠️ No-shows",   color: t.red },
+  { key: "stats",     label: "📊 Stats",       color: t.purple },
+];
+
+function StatCard({ icon, label, value, color }) {
+  return (
+    <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
+      <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontSize: 26, fontFamily: "Playfair Display, serif", color: color || t.green, marginBottom: 2 }}>{value}</div>
+      <div style={{ fontSize: 13, color: t.textMuted }}>{label}</div>
+    </div>
+  );
+}
+
+function Badge({ label, bg, color }) {
+  return <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: bg, color, fontWeight: 500 }}>{label}</span>;
+}
+
+function TrustBar({ score }) {
+  const pct = Math.min(100, Math.max(0, score));
+  const color = pct >= 4 ? t.green : pct >= 2.5 ? t.amber : t.red;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, height: 6, background: "#f0f0f0", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{ width: `${(pct / 5) * 100}%`, height: "100%", background: color, borderRadius: 99 }} />
+      </div>
+      <span style={{ fontSize: 12, color, fontWeight: 600 }}>{Number(score || 0).toFixed(1)}</span>
+    </div>
+  );
+}
+
+// ── Pending Verification Queue ─────────────────────────────────
+function PendingTab({ onAction }) {
+  const [pending, setPending] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState({});
+  const [acting, setActing] = useState(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("verification_status", "pending")
+      .order("created_at", { ascending: true });
+    setPending(data || []);
+    setLoading(false);
+  }
+
+  async function decide(user, decision) {
+    setActing(user.id);
+    await supabase.from("profiles").update({
+      verification_status: decision,
+      verified: decision === "approved",
+      verification_note: notes[user.id] || "",
+    }).eq("id", user.id);
+
+    // Notify user
+    await supabase.from("notifications").insert({
+      user_id: user.id,
+      type: decision === "approved" ? "accepted" : "rejected",
+      title: decision === "approved" ? "Account verified ✅" : "Verification rejected ❌",
+      message: decision === "approved"
+        ? `Welcome to AvoConnect, ${user.name.split(" ")[0]}! Your account is verified and you can now ${user.role === "farmer" ? "list avocados and receive orders" : "place orders"}.`
+        : `Your verification was not approved. Reason: ${notes[user.id] || "Does not meet requirements"}. Contact support to reapply.`,
+    });
+
+    setPending(p => p.filter(u => u.id !== user.id));
+    setActing(null);
+    onAction();
+  }
+
+  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  if (pending.length === 0) return (
+    <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+      <p style={{ color: t.textMuted }}>No pending verifications. All caught up!</p>
+    </div>
+  );
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 16 }}>{pending.length} account{pending.length > 1 ? "s" : ""} waiting for review</p>
+      {pending.map(u => (
+        <div key={u.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, marginBottom: 12, boxShadow: t.shadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontWeight: 600, fontSize: 16 }}>{u.name}</span>
+                <Badge
+                  label={u.role === "farmer" ? "🌱 Farmer" : "🏪 Buyer"}
+                  bg={u.role === "farmer" ? t.greenLight : t.blueLight || "#DBEAFE"}
+                  color={u.role === "farmer" ? t.greenDark : "#1E40AF"}
+                />
+              </div>
+              <div style={{ fontSize: 13, color: t.textMuted, display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <span>📞 {u.phone}</span>
+                <span>📍 {u.county} County</span>
+                <span>🗓 Joined {new Date(u.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </div>
+              {u.buyer_type && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>Buyer type: <strong>{u.buyer_type}</strong></div>}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>
+              Note (shown to user if rejected)
+            </label>
+            <input
+              type="text"
+              value={notes[u.id] || ""}
+              onChange={e => setNotes(p => ({ ...p, [u.id]: e.target.value }))}
+              placeholder="e.g. ID not clear, resubmit with clearer photo"
+              style={{ width: "100%", padding: "9px 12px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 13, background: t.cream, fontFamily: "Inter, sans-serif" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => decide(u, "rejected")}
+              disabled={acting === u.id}
+              style={{ ...btn("none", t.red, `1px solid #FCA5A5`), flex: 1, opacity: acting === u.id ? 0.6 : 1 }}
+            >
+              ✕ Reject
+            </button>
+            <button
+              onClick={() => decide(u, "approved")}
+              disabled={acting === u.id}
+              style={{ ...btn(t.green, t.white), flex: 2, opacity: acting === u.id ? 0.6 : 1 }}
+            >
+              ✓ Approve & verify
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── All Users ──────────────────────────────────────────────────
+function UsersTab() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [acting, setActing] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("*, reviews_received:reviews!reviews_reviewee_id_fkey(rating)")
+      .order("created_at", { ascending: false });
+    setUsers(data || []);
+    setLoading(false);
+  }
+
+  async function toggleSuspend(user) {
+    setActing(user.id);
+    const suspended = !user.suspended;
+    await supabase.from("profiles").update({ suspended }).eq("id", user.id);
+    setUsers(p => p.map(u => u.id === user.id ? { ...u, suspended } : u));
+
+    await supabase.from("notifications").insert({
+      user_id: user.id,
+      type: "rejected",
+      title: suspended ? "Account suspended ⛔" : "Account reinstated ✅",
+      message: suspended
+        ? "Your AvoConnect account has been suspended by admin. Contact support to appeal."
+        : "Your AvoConnect account has been reinstated. You can now trade normally.",
+    });
+    setActing(null);
+  }
+
+  async function clearStrikes(userId) {
+    await supabase.from("profiles").update({ strikes: 0, suspended: false }).eq("id", userId);
+    setUsers(p => p.map(u => u.id === userId ? { ...u, strikes: 0, suspended: false } : u));
+  }
+
+  async function changeVerification(user, status) {
+    setActing(user.id);
+    await supabase.from("profiles").update({
+      verification_status: status,
+      verified: status === "approved",
+    }).eq("id", user.id);
+    setUsers(p => p.map(u => u.id === user.id ? { ...u, verification_status: status, verified: status === "approved" } : u));
+    setActing(null);
+  }
+
+  const filtered = users.filter(u => {
+    const matchSearch = u.name?.toLowerCase().includes(search.toLowerCase()) ||
+      u.phone?.includes(search) || u.county?.toLowerCase().includes(search.toLowerCase());
+    const matchRole = filterRole === "all" || u.role === filterRole;
+    const matchStatus = filterStatus === "all" ||
+      (filterStatus === "verified" && u.verified) ||
+      (filterStatus === "pending" && u.verification_status === "pending") ||
+      (filterStatus === "suspended" && u.suspended);
+    return matchSearch && matchRole && matchStatus;
+  });
+
+  const verificationBadge = (u) => {
+    if (u.suspended) return <Badge label="⛔ Suspended" bg={t.redLight} color={t.red} />;
+    if (u.verified) return <Badge label="✅ Verified" bg={t.greenLight} color={t.greenDark} />;
+    if (u.verification_status === "rejected") return <Badge label="❌ Rejected" bg={t.redLight} color={t.red} />;
+    return <Badge label="⏳ Pending" bg={t.amberLight} color={t.amber} />;
+  };
+
+  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  return (
+    <div>
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search name, phone, county…"
+          style={{ flex: 1, minWidth: 200, padding: "9px 12px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 13, background: t.white, fontFamily: "Inter, sans-serif" }}
+        />
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+          style={{ padding: "9px 12px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 13, background: t.white, fontFamily: "Inter, sans-serif" }}>
+          <option value="all">All roles</option>
+          <option value="farmer">Farmers</option>
+          <option value="buyer">Buyers</option>
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ padding: "9px 12px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 13, background: t.white, fontFamily: "Inter, sans-serif" }}>
+          <option value="all">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="pending">Pending</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+
+      <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>{filtered.length} user{filtered.length !== 1 ? "s" : ""}</p>
+
+      {filtered.map(u => {
+        const avgRating = u.reviews_received?.length
+          ? (u.reviews_received.reduce((s, r) => s + r.rating, 0) / u.reviews_received.length).toFixed(1)
+          : null;
+        const isExpanded = expandedId === u.id;
+
+        return (
+          <div key={u.id} style={{ background: t.white, border: `1px solid ${u.suspended ? "#FCA5A5" : t.border}`, borderRadius: 14, padding: 16, marginBottom: 10, boxShadow: t.shadow }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, fontSize: 15 }}>{u.name}</span>
+                  <Badge
+                    label={u.role === "farmer" ? "🌱 Farmer" : "🏪 Buyer"}
+                    bg={u.role === "farmer" ? t.greenLight : "#DBEAFE"}
+                    color={u.role === "farmer" ? t.greenDark : "#1E40AF"}
+                  />
+                  {verificationBadge(u)}
+                  {u.strikes > 0 && <Badge label={`⚠️ ${u.strikes} strike${u.strikes > 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />}
+                </div>
+                <div style={{ fontSize: 12, color: t.textMuted, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <span>📞 {u.phone}</span>
+                  <span>📍 {u.county}</span>
+                  {avgRating && <span>⭐ {avgRating} ({u.reviews_received.length} reviews)</span>}
+                </div>
+              </div>
+              <button onClick={() => setExpandedId(isExpanded ? null : u.id)}
+                style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "5px 12px", fontSize: 12 }}>
+                {isExpanded ? "▲ Less" : "▼ More"}
+              </button>
+            </div>
+
+            {isExpanded && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${t.border}` }}>
+                {avgRating && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4 }}>Trust score</div>
+                    <TrustBar score={parseFloat(avgRating)} />
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {/* Suspend / Reinstate */}
+                  <button onClick={() => toggleSuspend(u)} disabled={acting === u.id}
+                    style={{ ...btn(u.suspended ? t.green : "none", u.suspended ? t.white : t.red, u.suspended ? "none" : `1px solid #FCA5A5`), opacity: acting === u.id ? 0.6 : 1 }}>
+                    {u.suspended ? "✓ Reinstate" : "⛔ Suspend"}
+                  </button>
+                  {/* Clear strikes */}
+                  {u.strikes > 0 && (
+                    <button onClick={() => clearStrikes(u.id)}
+                      style={btn("none", t.amber, `1px solid #FCD34D`)}>
+                      Clear strikes
+                    </button>
+                  )}
+                  {/* Re-verify */}
+                  {!u.verified && (
+                    <button onClick={() => changeVerification(u, "approved")} disabled={acting === u.id}
+                      style={{ ...btn(t.green, t.white), opacity: acting === u.id ? 0.6 : 1 }}>
+                      ✓ Verify now
+                    </button>
+                  )}
+                  {u.verified && (
+                    <button onClick={() => changeVerification(u, "pending")} disabled={acting === u.id}
+                      style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), opacity: acting === u.id ? 0.6 : 1 }}>
+                      Revoke verification
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── No-shows Tab ───────────────────────────────────────────────
+function NoShowsTab() {
+  const [noShows, setNoShows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("no_shows")
+      .select("*, buyer:profiles!no_shows_buyer_id_fkey(name, phone, county, strikes, suspended), farmer:profiles!no_shows_farmer_id_fkey(name, county), orders(quantity_kg, price_per_kg, listings(variety))")
+      .order("created_at", { ascending: false });
+    setNoShows(data || []);
+    setLoading(false);
+  }
+
+  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  if (noShows.length === 0) return (
+    <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+      <p style={{ color: t.textMuted }}>No no-shows recorded yet.</p>
+    </div>
+  );
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 16 }}>{noShows.length} no-show{noShows.length !== 1 ? "s" : ""} recorded</p>
+      {noShows.map(ns => (
+        <div key={ns.id} style={{ background: t.white, border: `1px solid #FCA5A5`, borderRadius: 14, padding: 16, marginBottom: 10, boxShadow: t.shadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{ns.buyer?.name}</span>
+                {ns.buyer?.suspended
+                  ? <Badge label="⛔ Suspended" bg={t.redLight} color={t.red} />
+                  : <Badge label={`⚠️ ${ns.buyer?.strikes} strike${ns.buyer?.strikes > 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />
+                }
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>
+                📞 {ns.buyer?.phone} · 📍 {ns.buyer?.county}
+              </div>
+            </div>
+            <span style={{ fontSize: 11, color: t.textMuted }}>{new Date(ns.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</span>
+          </div>
+          <div style={{ background: t.cream, borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>
+            <span style={{ color: t.textMuted }}>Farmer: </span><strong>{ns.farmer?.name}</strong>
+            {ns.orders && (
+              <span style={{ color: t.textMuted, marginLeft: 12 }}>
+                · {ns.orders.quantity_kg} kg {ns.orders.listings?.variety} · Ksh {(ns.orders.quantity_kg * ns.orders.price_per_kg).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Stats Tab ──────────────────────────────────────────────────
+function StatsTab() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const [
+      { count: totalUsers },
+      { count: farmers },
+      { count: buyers },
+      { count: verified },
+      { count: suspended },
+      { count: pending },
+      { count: totalOrders },
+      { count: completedOrders },
+      { count: noShows },
+      { count: totalListings },
+      { count: reviews },
+    ] = await Promise.all([
+      supabase.from("profiles").select("*", { count: "exact", head: true }),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "farmer"),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "buyer"),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("verified", true),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("suspended", true),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("verification_status", "pending"),
+      supabase.from("orders").select("*", { count: "exact", head: true }),
+      supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from("no_shows").select("*", { count: "exact", head: true }),
+      supabase.from("listings").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("reviews").select("*", { count: "exact", head: true }),
+    ]);
+
+    setStats({ totalUsers, farmers, buyers, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews });
+    setLoading(false);
+  }
+
+  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
+        <StatCard icon="👥" label="Total users" value={stats.totalUsers} color={t.blue} />
+        <StatCard icon="🌱" label="Farmers" value={stats.farmers} color={t.green} />
+        <StatCard icon="🏪" label="Buyers" value={stats.buyers} color={t.brown} />
+        <StatCard icon="✅" label="Verified" value={stats.verified} color={t.green} />
+        <StatCard icon="⏳" label="Pending review" value={stats.pending} color={t.amber} />
+        <StatCard icon="⛔" label="Suspended" value={stats.suspended} color={t.red} />
+        <StatCard icon="📦" label="Total orders" value={stats.totalOrders} color={t.blue} />
+        <StatCard icon="🎉" label="Completed" value={stats.completedOrders} color={t.green} />
+        <StatCard icon="⚠️" label="No-shows" value={stats.noShows} color={t.amber} />
+        <StatCard icon="🥑" label="Active listings" value={stats.totalListings} color={t.green} />
+        <StatCard icon="⭐" label="Reviews written" value={stats.reviews} color={t.purple} />
+      </div>
+
+      {stats.totalOrders > 0 && (
+        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Platform health</div>
+          {[
+            ["Order completion rate", stats.completedOrders, stats.totalOrders, t.green],
+            ["Verification rate", stats.verified, stats.totalUsers, t.blue],
+            ["No-show rate", stats.noShows, stats.totalOrders, t.red],
+          ].map(([label, num, den, color]) => {
+            const pct = den > 0 ? Math.round((num / den) * 100) : 0;
+            return (
+              <div key={label} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span>{label}</span>
+                  <span style={{ fontWeight: 600, color }}>{pct}%</span>
+                </div>
+                <div style={{ height: 8, background: "#f0f0f0", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main AdminPage ─────────────────────────────────────────────
+export default function AdminPage({ profile }) {
+  const [tab, setTab] = useState("pending");
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => { loadPendingCount(); }, []);
+
+  async function loadPendingCount() {
+    const { count } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("verification_status", "pending");
+    setPendingCount(count || 0);
+  }
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto", padding: "28px 16px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+        <div>
+          <h1 style={{ fontFamily: "Playfair Display, serif", fontSize: 30, marginBottom: 4 }}>Admin Dashboard</h1>
+          <p style={{ fontSize: 14, color: t.textMuted }}>AvoConnect · Logged in as {profile?.name}</p>
+        </div>
+        <div style={{ fontSize: 11, background: t.brownLight, color: t.brown, padding: "6px 14px", borderRadius: 99, fontWeight: 500 }}>
+          🔐 Admin access
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: `1px solid ${t.border}`, marginBottom: 24, overflowX: "auto" }}>
+        {TABS.map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)}
+            style={{
+              padding: "11px 20px", fontSize: 14, background: "none", border: "none", cursor: "pointer",
+              fontFamily: "Inter, sans-serif", whiteSpace: "nowrap",
+              borderBottom: `2px solid ${tab === tb.key ? tb.color : "transparent"}`,
+              color: tab === tb.key ? tb.color : t.textMuted,
+              fontWeight: tab === tb.key ? 600 : 400,
+            }}>
+            {tb.label}
+            {tb.key === "pending" && pendingCount > 0 && (
+              <span style={{ marginLeft: 6, background: t.amber, color: t.white, fontSize: 10, padding: "1px 7px", borderRadius: 99, fontWeight: 700 }}>
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "pending"  && <PendingTab onAction={loadPendingCount} />}
+      {tab === "users"    && <UsersTab />}
+      {tab === "no_shows" && <NoShowsTab />}
+      {tab === "stats"    && <StatsTab />}
+    </div>
+  );
+}
