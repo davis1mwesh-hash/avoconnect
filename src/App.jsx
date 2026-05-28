@@ -231,7 +231,7 @@ function Nav({ setPage, profile, onSignOut }) {
             )}
             {/* 🔔 Notification Bell — shows for both farmers and buyers */}
             <NotificationBell profile={profile} />
-            {profile?.email === "davidgichovi@gmail.com" && (
+            {0710701013 && (
   <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
 )}
 <button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
@@ -900,7 +900,7 @@ export default function App() {
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
-{pageName === "admin" && profile?.email === "davidgichovi@gmail.com" && <AdminPage profile={profile} />}
+{pageName === "admin" && 0710701013 && <AdminPage profile={profile} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
       </div>
     </>
