@@ -989,7 +989,7 @@ async function fetchCoop() {
           county: form.county || profile.county || "Embu",
           variety: form.variety || "Hass",
           expected_kg: Number(form.expected_kg) || 0,
-          cooperative_id: trueCooperativeId, // 👈 Guaranteed to be a valid matching foreign key now
+          cooperative_id:33688f54-ccbc-43a4-9a4e-d4c1bddabd6a // 👈 Guaranteed to be a valid matching foreign key now
         })
         .select()
         .single();
