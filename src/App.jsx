@@ -232,6 +232,12 @@ function Nav({ setPage, profile, onSignOut }) {
                 <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
               </>
             )}
+            {profile.role === "cooperative" && (
+              <>
+                <button onClick={() => setPage("coop-dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>My Cooperative</button>
+                <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
+              </>
+            )}
             {profile.role === "company" && (
               <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
             )}
@@ -724,7 +730,7 @@ function Signup({ setPage, setProfile }) {
     const email = `u${form.phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
     const { data, error: e1 } = await supabase.auth.signUp({ email, password: form.password });
     if (e1) { setError(e1.message); setLoading(false); return; }
-    const { error: e2 } = await supabase.from("profiles").insert({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role, buyer_type: form.buyerType || null });
+    const { error: e2 } = await supabase.from("profiles").insert({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role, buyer_type: form.buyerType || null, reg_number: form.reg_number || null, kra_pin: form.kra_pin || null, member_count: Number(form.member_count) || null, verified: role === "farmer" ? true : false });
     if (e2) { setError(e2.message); setLoading(false); return; }
     setProfile({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role });
     setPage(role === "farmer" ? "dashboard" : "home");
@@ -739,7 +745,7 @@ function Signup({ setPage, setProfile }) {
       </div>
       <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
-        {[["farmer","🌱 I'm a Farmer"],["buyer","🏪 I'm a Buyer"],["company","🏢 I'm a Company"]].map(([r, label]) => (
+        {[["farmer","🌱 I'm a Farmer"],["buyer","🏪 I'm a Buyer"],["company","🏢 I'm a Company"],["cooperative","🤝 I'm a Cooperative"]].map(([r, label]) => (
             <button key={r} onClick={() => setRole(r)}
               style={{ padding: 14, border: `2px solid ${role === r ? t.green : t.border}`, borderRadius: 12, background: role === r ? t.greenLight : "none", color: role === r ? t.greenDark : t.textMuted, fontSize: 13, fontWeight: 600, transition: "all .15s" }}>
               {label}
@@ -759,6 +765,27 @@ function Signup({ setPage, setProfile }) {
             {COUNTIES.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
+        {role === "cooperative" && (
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Cooperative Registration Number</label>
+              <input value={form.reg_number || ""} onChange={e => setForm({ ...form, reg_number: e.target.value })} placeholder="e.g. CPO/2019/001234" style={inp} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>KRA PIN</label>
+              <input value={form.kra_pin || ""} onChange={e => setForm({ ...form, kra_pin: e.target.value })} placeholder="e.g. P051234567T" style={inp} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Number of members</label>
+              <input type="number" value={form.member_count || ""} onChange={e => setForm({ ...form, member_count: e.target.value })} placeholder="e.g. 45" style={inp} />
+            </div>
+            <div style={{ marginBottom: 14, padding: "12px 14px", background: t.greenLight, borderRadius: 10, border: `1px solid ${t.green}30` }}>
+              <p style={{ fontSize: 13, color: t.greenDark, lineHeight: 1.6 }}>
+                🤝 Your cooperative will be reviewed and verified before going live. This usually takes 1–2 business days.
+              </p>
+            </div>
+          </>
+        )}
         {error && <p style={{ fontSize: 13, color: "#E24B4A", marginBottom: 12, padding: "10px 12px", background: "#FEF2F2", borderRadius: 8 }}>{error}</p>}
         <button onClick={submit} disabled={loading} style={{ ...btn(t.green, t.white), width: "100%", padding: 13, fontSize: 15, opacity: loading ? .7 : 1 }}>
           {loading ? "Creating your account…" : "Create account →"}
@@ -883,6 +910,157 @@ function ListForm({ setPage, profile }) {
     </div>
   );
 }
+// ── Coop Dashboard ────────────────────────────────────────────
+function CoopDashboard({ profile, setPage }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
+
+  useEffect(() => { loadMembers(); }, []);
+
+  async function loadMembers() {
+    const { data } = await supabase.from("cooperative_members").select("*").eq("cooperative_id", profile.coop_id || profile.id).order("created_at", { ascending: true });
+    setMembers(data || []);
+    setLoading(false);
+  }
+
+  async function addMember() {
+    if (!form.name || !form.phone) return;
+    const { data, error } = await supabase.from("cooperative_members").insert({
+      ...form,
+      expected_kg: Number(form.expected_kg) || 0,
+      cooperative_id: profile.coop_id || profile.id,
+    }).select().single();
+    if (error) { alert(error.message); return; }
+    setMembers(prev => [...prev, data]);
+    setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
+    setShowAdd(false);
+  }
+
+  async function deleteMember(id) {
+    if (!confirm("Remove this member?")) return;
+    await supabase.from("cooperative_members").delete().eq("id", id);
+    setMembers(prev => prev.filter(m => m.id !== id));
+  }
+
+  const totalKg = members.reduce((s, m) => s + (m.expected_kg || 0), 0);
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+        <div>
+          <h1 className="serif" style={{ fontSize: 30, marginBottom: 4 }}>🤝 {profile.name}</h1>
+          <p style={{ fontSize: 14, color: t.textMuted }}>{profile.county} County · {profile.reg_number || "Pending verification"}</p>
+          {!profile.verified && (
+            <div style={{ marginTop: 8, padding: "6px 14px", background: "#FEF3C7", borderRadius: 8, display: "inline-block" }}>
+              <span style={{ fontSize: 12, color: "#92400E" }}>⏳ Awaiting admin verification</span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowAdd(true)} style={{ ...btn(t.green, t.white), padding: "9px 18px" }}>+ Add member</button>
+          <button onClick={() => setPage("list")} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "9px 18px" }}>List avocados</button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 28 }}>
+        {[["👥 Members", members.length, "registered"], ["🧺 Total kg", totalKg.toLocaleString(), "expected harvest"], ["📍 County", profile.county, "base location"]].map(([icon, value, sub]) => (
+          <div key={sub} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
+            <div style={{ fontSize: 22, marginBottom: 6 }}>{icon.split(" ")[0]}</div>
+            <div className="serif" style={{ fontSize: 24, color: t.green, marginBottom: 2 }}>{value}</div>
+            <div style={{ fontSize: 11, color: t.textMuted }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Members list */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600 }}>Members</h2>
+        <span style={{ fontSize: 13, color: t.textMuted }}>{members.length} members · {totalKg.toLocaleString()} kg total</span>
+      </div>
+
+      {loading ? (
+        <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+      ) : members.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+          <p style={{ color: t.textMuted, marginBottom: 16 }}>No members yet. Add your first member.</p>
+          <button onClick={() => setShowAdd(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>Add first member</button>
+        </div>
+      ) : members.map((m, i) => (
+        <div key={m.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 12, padding: 16, marginBottom: 10, display: "flex", alignItems: "center", gap: 14, boxShadow: t.shadow }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: t.greenLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: t.greenDark, flexShrink: 0 }}>
+            {i + 1}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{m.name}</div>
+            <div style={{ fontSize: 12, color: t.textMuted, display: "flex", gap: 12 }}>
+              <span>📞 {m.phone}</span>
+              {m.county && <span>📍 {m.county}</span>}
+              <span style={{ background: t.greenLight, color: t.greenDark, padding: "1px 8px", borderRadius: 99 }}>{m.variety}</span>
+            </div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: t.greenDark }}>{m.expected_kg?.toLocaleString() || 0} kg</div>
+            <div style={{ fontSize: 11, color: t.textMuted }}>expected</div>
+          </div>
+          <button onClick={() => deleteMember(m.id)} style={{ ...btn("none", "#EF4444", "1px solid #FCA5A5"), padding: "6px 12px", fontSize: 12 }}>Remove</button>
+        </div>
+      ))}
+
+      {/* Combined listing CTA */}
+      {members.length > 0 && (
+        <div style={{ marginTop: 20, padding: 20, background: `linear-gradient(135deg, ${t.greenLight}, ${t.brownLight})`, borderRadius: 14, border: `1px solid ${t.border}` }}>
+          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Ready to list as a cooperative?</div>
+          <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 16 }}>
+            You have <strong>{members.length} members</strong> with a combined <strong>{totalKg.toLocaleString()} kg</strong> expected. Post one combined listing that buyers across Kenya will see.
+          </p>
+          <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>Post combined listing →</button>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAdd && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
+          <div style={{ background: t.white, borderRadius: 16, padding: 24, width: "100%", maxWidth: 440 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>Add cooperative member</h3>
+            {[["Full name", "name", "text"], ["Phone number", "phone", "tel"]].map(([label, key, type]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>{label}</label>
+                <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder={label} style={inp} />
+              </div>
+            ))}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County</label>
+                <select value={form.county} onChange={e => setForm({ ...form, county: e.target.value })} style={inp}>
+                  <option value="">Select</option>
+                  {COUNTIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Variety</label>
+                <select value={form.variety} onChange={e => setForm({ ...form, variety: e.target.value })} style={inp}>
+                  {VARIETIES.map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Expected kg this season</label>
+              <input type="number" value={form.expected_kg} onChange={e => setForm({ ...form, expected_kg: e.target.value })} placeholder="e.g. 300" style={inp} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowAdd(false)} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), flex: 1 }}>Cancel</button>
+              <button onClick={addMember} style={{ ...btn(t.green, t.white), flex: 2 }}>Add member</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── App ───────────────────────────────────────────────────────
 export default function App() {
@@ -918,6 +1096,7 @@ export default function App() {
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
+        {pageName === "coop-dashboard" && profile?.role === "cooperative" && <CoopDashboard profile={profile} setPage={setPage} />}
  {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
