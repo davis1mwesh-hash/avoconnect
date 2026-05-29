@@ -916,17 +916,16 @@ function CoopDashboard({ profile, setPage }) {
   const [members, setMembers] = useState([]);
   const [cooperative, setCooperative] = useState(null);
 
-useEffect(() => {
-  async function fetchCoop() {
+async function fetchCoop() {
     if (!profile?.id) return;
     const { data } = await supabase
       .from("cooperatives")
       .select("*")
       .eq("admin_id", profile.id)
       .maybeSingle();
-    
+
     if (data) {
-      setCooperative(data);
+      setCooperative(data); // This populates cooperative.id with "8752cb93..."
     }
   }
   fetchCoop();
@@ -954,31 +953,46 @@ useEffect(() => {
     }
     setLoading(false);
   }
-  async function addMember() {
+ async function addMember() {
     if (!form.name || !form.phone) return;
-    if (!cooperative?.id) { 
-        alert("Cooperative profile loading... Please try again in a moment."); 
-        return; 
+
+    // 1. Double check that we have the cooperative data and its proper row ID
+    if (!cooperative?.id) {
+      alert("Cooperative profile loading... Please wait a moment and try again.");
+      return;
     }
 
-   .insert({
+    // 2. Insert using the correct, verified primary key UUID
+    const { data, error } = await supabase
+      .from("cooperative_members")
+      .insert({
         name: form.name,
         phone: form.phone,
         county: form.county || profile.county || "Embu",
         variety: form.variety || "Hass",
         expected_kg: Number(form.expected_kg) || 0,
-        cooperative_id: cooperative.id, // 👈 Links flawlessly to your cooperative profile row
+        cooperative_id: cooperative.id, // 👈 This will now correctly send "8752cb93-908b-4c01-b1df-ad3fcf007728"
       })
+      .select()
+      .single();
 
-    if (error) { 
-        alert(error.message); 
-        return; 
+    if (error) {
+      alert("Database Error: " + error.message);
+      return;
+    }
+
+    // 3. Smoothly update UI state
+    if (data) {
+      setMembers(prev => [data, ...prev]);
     }
     
-    setMembers(prev => [...prev, data]);
     setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
     setShowAdd(false);
-}
+    
+    if (typeof loadMembers === "function") {
+      loadMembers();
+    }
+  }
 
   async function deleteMember(id) {
     if (!confirm("Remove this member?")) return;
