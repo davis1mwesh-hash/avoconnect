@@ -935,14 +935,25 @@ useEffect(() => {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
 
-  useEffect(() => { loadMembers(); }, []);
+ // Trigger loading members whenever the cooperative state finishes fetching
+  useEffect(() => {
+    if (cooperative?.id) {
+      loadMembers();
+    }
+  }, [cooperative]);
 
   async function loadMembers() {
-    const { data } = await supabase.from("cooperative_members").select("*").eq("cooperative_id", profile.coop_id || profile.id).order("created_at", { ascending: true });
-    setMembers(data || []);
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("cooperative_members")
+      .select("*")
+      .eq("cooperative_id", cooperative.id); // 👈 Filter strictly for your members
+    
+    if (!error && data) {
+      setMembers(data);
+    }
     setLoading(false);
   }
-
   async function addMember() {
     if (!form.name || !form.phone) return;
     if (!cooperative?.id) { 
@@ -950,15 +961,14 @@ useEffect(() => {
         return; 
     }
 
-    const { data, error } = await supabase
-      .from("cooperative_members")
-      .insert({
-        ...form,
+   .insert({
+        name: form.name,
+        phone: form.phone,
+        county: form.county || profile.county || "Embu",
+        variety: form.variety || "Hass",
         expected_kg: Number(form.expected_kg) || 0,
-        cooperative_id: cooperative.id, // 👈 CRITICAL FIX: Explicitly links to the correct table ID
+        cooperative_id: cooperative.id, // 👈 Links flawlessly to your cooperative profile row
       })
-      .select()
-      .single();
 
     if (error) { 
         alert(error.message); 
