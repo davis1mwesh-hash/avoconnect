@@ -28,8 +28,10 @@ const TABS = [
   { key: "pending",   label: "⏳ Pending",    color: t.amber },
   { key: "users",     label: "👥 All Users",   color: t.blue },
   { key: "no_shows",  label: "⚠️ No-shows",   color: t.red },
+  { key: "resources", label: "🌿 Resources",   color: t.green },
   { key: "stats",     label: "📊 Stats",       color: t.purple },
 ];
+ 
 
 function StatCard({ icon, label, value, color }) {
   return (
@@ -489,6 +491,114 @@ function StatsTab() {
   );
 }
 
+// ── Resources Admin Tab ────────────────────────────────────────
+function ResourcesTab() {
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+  const [notes, setNotes] = useState({});
+  const [acting, setActing] = useState(null);
+ 
+  useEffect(() => { load(); }, [filter]);
+ 
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("resources")
+      .select("*, profiles(name, company_name, phone)")
+      .eq("status", filter)
+      .order("created_at", { ascending: false });
+    setResources(data || []);
+    setLoading(false);
+  }
+ 
+  async function decide(resource, status) {
+    setActing(resource.id);
+    await supabase.from("resources").update({
+      status,
+      admin_note: notes[resource.id] || "",
+    }).eq("id", resource.id);
+ 
+    await supabase.from("notifications").insert({
+      user_id: resource.company_id,
+      type: status === "approved" ? "accepted" : "rejected",
+      title: status === "approved" ? "Resource approved ✅" : "Resource rejected ❌",
+      message: status === "approved"
+        ? `Your resource "${resource.title}" has been approved and is now live on AvoConnect.`
+        : `Your resource "${resource.title}" was not approved. ${notes[resource.id] ? "Reason: " + notes[resource.id] : "Please review and resubmit."}`,
+    });
+ 
+    setResources(p => p.filter(r => r.id !== resource.id));
+    setActing(null);
+  }
+ 
+  const TYPE_LABELS = { input: "🌿 Input", guide: "📖 Guide", link: "🔗 Link" };
+ 
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {["pending","approved","rejected"].map(s => (
+          <button key={s} onClick={() => setFilter(s)}
+            style={{ padding: "7px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer", border: "none", fontFamily: "Inter, sans-serif", fontWeight: filter === s ? 600 : 400, background: filter === s ? t.green : t.brownLight, color: filter === s ? t.white : t.textMuted }}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+ 
+      {loading ? (
+        <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+      ) : resources.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+          <p style={{ color: t.textMuted }}>No {filter} resources.</p>
+        </div>
+      ) : resources.map(r => (
+        <div key={r.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, marginBottom: 12, boxShadow: t.shadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, padding: "2px 10px", borderRadius: 99, background: t.greenLight, color: t.greenDark, fontWeight: 500 }}>{TYPE_LABELS[r.type]}</span>
+                {r.category && <span style={{ fontSize: 11, padding: "2px 10px", borderRadius: 99, background: t.brownLight, color: t.brown, fontWeight: 500 }}>{r.category}</span>}
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{r.title}</div>
+              <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>
+                🏢 {r.profiles?.company_name || r.profiles?.name} · 📞 {r.profiles?.phone}
+              </div>
+              {r.description && <p style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.6, marginBottom: 6 }}>{r.description}</p>}
+              {r.price && <div style={{ fontSize: 13, color: t.greenDark, fontWeight: 500 }}>{r.price}</div>}
+              {r.external_url && <a href={r.external_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: t.blue }}>{r.external_url}</a>}
+            </div>
+            {r.photo_url && (
+              <img src={r.photo_url} alt={r.title} style={{ width: 80, height: 80, borderRadius: 12, objectFit: "cover", marginLeft: 16, flexShrink: 0 }} />
+            )}
+          </div>
+ 
+          {filter === "pending" && (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Admin note (shown if rejected)</label>
+                <input type="text" value={notes[r.id] || ""} onChange={e => setNotes(p => ({ ...p, [r.id]: e.target.value }))}
+                  placeholder="e.g. Missing product registration number"
+                  style={{ width: "100%", padding: "9px 12px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 13, background: t.cream, fontFamily: "Inter, sans-serif" }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => decide(r, "rejected")} disabled={acting === r.id}
+                  style={{ flex: 1, padding: "9px", background: "none", border: "1px solid #FCA5A5", borderRadius: 10, color: t.red, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif", opacity: acting === r.id ? 0.6 : 1 }}>
+                  ✕ Reject
+                </button>
+                <button onClick={() => decide(r, "approved")} disabled={acting === r.id}
+                  style={{ flex: 2, padding: "9px", background: t.green, border: "none", borderRadius: 10, color: t.white, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif", opacity: acting === r.id ? 0.6 : 1 }}>
+                  ✓ Approve & publish
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+ 
 // ── Main AdminPage ─────────────────────────────────────────────
 export default function AdminPage({ profile }) {
   const [tab, setTab] = useState("pending");
@@ -538,10 +648,11 @@ export default function AdminPage({ profile }) {
         ))}
       </div>
 
-      {tab === "pending"  && <PendingTab onAction={loadPendingCount} />}
-      {tab === "users"    && <UsersTab />}
-      {tab === "no_shows" && <NoShowsTab />}
-      {tab === "stats"    && <StatsTab />}
+      {tab === "pending"   && <PendingTab onAction={loadPendingCount} />}
+      {tab === "users"     && <UsersTab />}
+      {tab === "no_shows"  && <NoShowsTab />}
+      {tab === "resources" && <ResourcesTab />}
+      {tab === "stats"     && <StatsTab />}
     </div>
   );
 }

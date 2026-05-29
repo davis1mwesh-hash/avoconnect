@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import FarmDiary from "./FarmDiary";
 import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
+import Resources from "./Resources";
+import CompanyDashboard from "./CompanyDashboard";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -222,12 +224,16 @@ function Nav({ setPage, profile, onSignOut }) {
             <div style={{ fontSize: 13, color: t.textMuted, padding: "6px 12px", background: t.brownLight, borderRadius: 8 }}>
               👋 {profile.name.split(" ")[0]}
             </div>
+             <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
             {profile.role === "farmer" && (
               <>
                 <button onClick={() => setPage("dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Dashboard</button>
                 <button onClick={() => setPage("diary")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Farm Diary</button>
                 <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
               </>
+            )}
+            {profile.role === "company" && (
+              <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
             )}
             {/* 🔔 Notification Bell — shows for both farmers and buyers */}
             <NotificationBell profile={profile} />
@@ -238,6 +244,7 @@ function Nav({ setPage, profile, onSignOut }) {
           </>
         ) : (
           <>
+            <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
             <button onClick={() => setPage("login")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 16px" }}>Log in</button>
             <button onClick={() => setPage("signup")} style={{ ...btn(t.green, t.white), padding: "7px 18px" }}>Join free</button>
           </>
@@ -369,6 +376,7 @@ function ListingDetail({ listing: l, setPage, profile }) {
 
   async function placeOrder() {
     if (!profile) { setPage("signup"); return; }
+if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch to a buyer account."); return; }
     setLoading(true);
     const { data: buyerProfile } = await supabase.from("profiles").select("suspended, verified").eq("id", profile.id).single();
     if (buyerProfile?.suspended) { setError("Your account is suspended due to no-shows. Contact support."); setLoading(false); return; }
@@ -419,6 +427,11 @@ function ListingDetail({ listing: l, setPage, profile }) {
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 20 }}>
+  {profile?.role === "farmer" && (
+    <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: t.amberDark, fontWeight: 500 }}>🌱 You are logged in as a farmer. Only buyers can place orders.</p>
+    </div>
+  )}
             <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 6, fontWeight: 500 }}>Order quantity (kg)</label>
             <input type="number" min="1" value={qty} onChange={e => setQty(Number(e.target.value))} style={{ ...inp, marginBottom: 12 }} />
             <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 6, fontWeight: 500 }}>Message to farmer (optional)</label>
@@ -726,10 +739,10 @@ function Signup({ setPage, setProfile }) {
       </div>
       <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
-          {["farmer", "buyer"].map(r => (
+        {[["farmer","🌱 I'm a Farmer"],["buyer","🏪 I'm a Buyer"],["company","🏢 I'm a Company"]].map(([r, label]) => (
             <button key={r} onClick={() => setRole(r)}
-              style={{ padding: 14, border: `2px solid ${role === r ? t.green : t.border}`, borderRadius: 12, background: role === r ? t.greenLight : "none", color: role === r ? t.greenDark : t.textMuted, fontSize: 14, fontWeight: 600, transition: "all .15s" }}>
-              {r === "farmer" ? "🌱 I'm a Farmer" : "🏪 I'm a Buyer"}
+              style={{ padding: 14, border: `2px solid ${role === r ? t.green : t.border}`, borderRadius: 12, background: role === r ? t.greenLight : "none", color: role === r ? t.greenDark : t.textMuted, fontSize: 13, fontWeight: 600, transition: "all .15s" }}>
+              {label}
             </button>
           ))}
         </div>
@@ -905,7 +918,9 @@ export default function App() {
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
-{pageName === "admin" && 0710701013 && <AdminPage profile={profile} />}
+ {pageName === "admin" && profile?.phone === "07XXXXXXXX" && <AdminPage profile={profile} />}
+        {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
+        {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
       </div>
     </>
