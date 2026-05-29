@@ -5,6 +5,7 @@ import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
 import Resources from "./Resources";
 import CompanyDashboard from "./CompanyDashboard";
+import CoopDashboard from "./CoopDashboard"; 
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
