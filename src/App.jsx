@@ -914,6 +914,23 @@ function ListForm({ setPage, profile }) {
 // ── Coop Dashboard ────────────────────────────────────────────
 function CoopDashboard({ profile, setPage }) {
   const [members, setMembers] = useState([]);
+  const [cooperative, setCooperative] = useState(null);
+
+useEffect(() => {
+  async function fetchCoop() {
+    if (!profile?.id) return;
+    const { data } = await supabase
+      .from("cooperatives")
+      .select("*")
+      .eq("admin_id", profile.id)
+      .maybeSingle();
+    
+    if (data) {
+      setCooperative(data);
+    }
+  }
+  fetchCoop();
+}, [profile]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
@@ -928,16 +945,30 @@ function CoopDashboard({ profile, setPage }) {
 
   async function addMember() {
     if (!form.name || !form.phone) return;
-    const { data, error } = await supabase.from("cooperative_members").insert({
-      ...form,
-      expected_kg: Number(form.expected_kg) || 0,
-      cooperative_id: profile.coop_id || profile.id,
-    }).select().single();
-    if (error) { alert(error.message); return; }
+    if (!cooperative?.id) { 
+        alert("Cooperative profile loading... Please try again in a moment."); 
+        return; 
+    }
+
+    const { data, error } = await supabase
+      .from("cooperative_members")
+      .insert({
+        ...form,
+        expected_kg: Number(form.expected_kg) || 0,
+        cooperative_id: cooperative.id, // 👈 CRITICAL FIX: Explicitly links to the correct table ID
+      })
+      .select()
+      .single();
+
+    if (error) { 
+        alert(error.message); 
+        return; 
+    }
+    
     setMembers(prev => [...prev, data]);
     setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
     setShowAdd(false);
-  }
+}
 
   async function deleteMember(id) {
     if (!confirm("Remove this member?")) return;
