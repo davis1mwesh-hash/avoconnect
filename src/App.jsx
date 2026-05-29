@@ -5,7 +5,7 @@ import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
 import Resources from "./Resources";
 import CompanyDashboard from "./CompanyDashboard";
-import CoopDashboard from "./CoopDashboard"; 
+import CoopDashboard from "./CoopDashboard";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -27,6 +27,9 @@ const t = {
   border: "#E2DDD6",
   shadow: "0 2px 12px rgba(0,0,0,.06)",
   shadowHover: "0 8px 24px rgba(0,0,0,.10)",
+  // FIX 1: Added missing amber colors used in ListingDetail
+  amberLight: "#FEF3C7",
+  amberDark: "#92400E",
 };
 
 const css = `
@@ -67,7 +70,6 @@ function NotificationBell({ profile }) {
     if (!profile) return;
     loadNotifications();
 
-    // Real-time: listen for new notifications for this user
     const channel = supabase
       .channel("notifications:" + profile.id)
       .on("postgres_changes", {
@@ -83,7 +85,6 @@ function NotificationBell({ profile }) {
     return () => supabase.removeChannel(channel);
   }, [profile]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e) {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -126,7 +127,6 @@ function NotificationBell({ profile }) {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      {/* Bell button */}
       <button
         onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
         style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
@@ -146,7 +146,6 @@ function NotificationBell({ profile }) {
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 10px)", right: 0,
@@ -155,7 +154,6 @@ function NotificationBell({ profile }) {
           zIndex: 999, animation: "slideDown .15s ease",
           maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
         }}>
-          {/* Header */}
           <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
             <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
             {unread > 0 && (
@@ -165,7 +163,6 @@ function NotificationBell({ profile }) {
             )}
           </div>
 
-          {/* List */}
           <div style={{ overflowY: "auto", flex: 1 }}>
             {notifications.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center" }}>
@@ -225,7 +222,7 @@ function Nav({ setPage, profile, onSignOut }) {
             <div style={{ fontSize: 13, color: t.textMuted, padding: "6px 12px", background: t.brownLight, borderRadius: 8 }}>
               👋 {profile.name.split(" ")[0]}
             </div>
-             <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
+            <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
             {profile.role === "farmer" && (
               <>
                 <button onClick={() => setPage("dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Dashboard</button>
@@ -242,12 +239,13 @@ function Nav({ setPage, profile, onSignOut }) {
             {profile.role === "company" && (
               <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
             )}
-            {/* 🔔 Notification Bell — shows for both farmers and buyers */}
             <NotificationBell profile={profile} />
-            {0710701013 && (
-  <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
-)}
-<button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
+            {/* FIX 2: Was `{0710701013 && ...}` — a truthy number, showing Admin to everyone.
+                      Now correctly checks the logged-in user's phone number. */}
+            {profile.phone === "0710701013" && (
+              <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
+            )}
+            <button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
           </>
         ) : (
           <>
@@ -304,10 +302,11 @@ function Home({ setPage }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by county, variety or farmer name…"
               style={{ flex: 1, minWidth: 240, padding: "13px 18px", border: "none", borderRadius: 12, fontSize: 14, background: "rgba(255,255,255,.95)", color: t.text, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }} />
+            {/* FIX 3: Added explicit value="" on the "All" option so variety state matches correctly */}
             <select value={variety} onChange={e => setVariety(e.target.value)}
               style={{ padding: "13px 16px", border: "none", borderRadius: 12, fontSize: 14, background: "rgba(255,255,255,.95)", color: t.text, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
-              <option>All varieties</option>
-              {VARIETIES.map(v => <option key={v}>{v}</option>)}
+              <option value="All">All varieties</option>
+              {VARIETIES.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
         </div>
@@ -383,7 +382,7 @@ function ListingDetail({ listing: l, setPage, profile }) {
 
   async function placeOrder() {
     if (!profile) { setPage("signup"); return; }
-if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch to a buyer account."); return; }
+    if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch to a buyer account."); return; }
     setLoading(true);
     const { data: buyerProfile } = await supabase.from("profiles").select("suspended, verified").eq("id", profile.id).single();
     if (buyerProfile?.suspended) { setError("Your account is suspended due to no-shows. Contact support."); setLoading(false); return; }
@@ -434,11 +433,12 @@ if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch t
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 20 }}>
-  {profile?.role === "farmer" && (
-    <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
-      <p style={{ fontSize: 13, color: t.amberDark, fontWeight: 500 }}>🌱 You are logged in as a farmer. Only buyers can place orders.</p>
-    </div>
-  )}
+            {/* FIX 4: t.amberLight / t.amberDark were undefined — now defined in theme object */}
+            {profile?.role === "farmer" && (
+              <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+                <p style={{ fontSize: 13, color: t.amberDark, fontWeight: 500 }}>🌱 You are logged in as a farmer. Only buyers can place orders.</p>
+              </div>
+            )}
             <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 6, fontWeight: 500 }}>Order quantity (kg)</label>
             <input type="number" min="1" value={qty} onChange={e => setQty(Number(e.target.value))} style={{ ...inp, marginBottom: 12 }} />
             <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 6, fontWeight: 500 }}>Message to farmer (optional)</label>
@@ -465,10 +465,10 @@ if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch t
 function FarmerDashboard({ setPage, profile }) {
   const [tab, setTab] = useState("listings");
   const [, forceUpdate] = useState(0);
-useEffect(() => {
-  const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
-  return () => clearInterval(interval);
-}, []);
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -496,17 +496,13 @@ useEffect(() => {
     setListings(prev => prev.map(l => l.id === listing.id ? { ...l, is_active: !l.is_active } : l));
   }
 
-  // ── Core: accept/reject order + deduct listing + notify buyer ──
   async function updateOrderStatus(orderId, status) {
-    // 1. Find the order
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
-    // 2. Update order status
     await supabase.from("orders").update({ status }).eq("id", orderId);
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
 
-    // 3. If ACCEPTED → deduct quantity from listing
     if (status === "accepted") {
       const listing = listings.find(l => l.id === order.listing_id);
       if (listing) {
@@ -526,7 +522,6 @@ useEffect(() => {
         ));
       }
 
-      // 4. Notify buyer — order accepted
       const varietyName = order.listings?.variety || "avocados";
       const totalKsh = (order.quantity_kg * order.price_per_kg).toLocaleString();
       await supabase.from("notifications").insert({
@@ -537,7 +532,6 @@ useEffect(() => {
       });
     }
 
-    // 5. If REJECTED → notify buyer
     if (status === "rejected") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
@@ -548,7 +542,6 @@ useEffect(() => {
       });
     }
 
-    // 6. If COMPLETED → notify buyer
     if (status === "completed") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
@@ -651,7 +644,6 @@ useEffect(() => {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 10px", borderRadius: 99, fontWeight: 500 }}>{l.variety}</span>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? "#D1FAE5" : "#F3F4F6", color: l.is_active ? "#065F46" : t.textMuted }}>{l.is_active ? "● Active" : "● Hidden"}</span>
-                    {/* Show sold-out badge if qty is 0 */}
                     {l.quantity_kg === 0 && (
                       <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>
                     )}
@@ -734,7 +726,7 @@ function Signup({ setPage, setProfile }) {
     const { error: e2 } = await supabase.from("profiles").insert({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role, buyer_type: form.buyerType || null, reg_number: form.reg_number || null, kra_pin: form.kra_pin || null, member_count: Number(form.member_count) || null, verified: role === "farmer" ? true : false });
     if (e2) { setError(e2.message); setLoading(false); return; }
     setProfile({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role });
-    setPage(role === "farmer" ? "dashboard" : "home");
+    setPage(role === "farmer" ? "dashboard" : role === "cooperative" ? "coop-dashboard" : "home");
   }
 
   return (
@@ -746,7 +738,7 @@ function Signup({ setPage, setProfile }) {
       </div>
       <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
-        {[["farmer","🌱 I'm a Farmer"],["buyer","🏪 I'm a Buyer"],["company","🏢 I'm a Company"],["cooperative","🤝 I'm a Cooperative"]].map(([r, label]) => (
+          {[["farmer","🌱 I'm a Farmer"],["buyer","🏪 I'm a Buyer"],["company","🏢 I'm a Company"],["cooperative","🤝 I'm a Cooperative"]].map(([r, label]) => (
             <button key={r} onClick={() => setRole(r)}
               style={{ padding: 14, border: `2px solid ${role === r ? t.green : t.border}`, borderRadius: 12, background: role === r ? t.greenLight : "none", color: role === r ? t.greenDark : t.textMuted, fontSize: 13, fontWeight: 600, transition: "all .15s" }}>
               {label}
@@ -814,7 +806,11 @@ function Login({ setPage, setProfile }) {
     if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
     const { data: p } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
     setProfile(p);
-    setPage(p.role === "farmer" ? "dashboard" : "home");
+    // FIX 5: Cooperatives now correctly redirect to their dashboard on login
+    if (p.role === "farmer") setPage("dashboard");
+    else if (p.role === "cooperative") setPage("coop-dashboard");
+    else if (p.role === "company") setPage("company-dashboard");
+    else setPage("home");
   }
 
   return (
@@ -911,34 +907,31 @@ function ListForm({ setPage, profile }) {
     </div>
   );
 }
+
 // ── Coop Dashboard ────────────────────────────────────────────
 function CoopDashboard({ profile, setPage }) {
   const [members, setMembers] = useState([]);
   const [cooperative, setCooperative] = useState(null);
-
-async function fetchCoop() {
-    if (!profile?.id) return;
-    const { data } = await supabase
-      .from("cooperatives")
-      .select("*")
-      .eq("admin_id", profile.id)
-      .maybeSingle();
-
-    if (data) {
-      setCooperative(data); // This populates cooperative.id with "8752cb93..."
-    }
-  }
-  fetchCoop();
-}, [profile]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
 
- // Trigger loading members whenever the cooperative state finishes fetching
   useEffect(() => {
-    if (cooperative?.id) {
-      loadMembers();
+    async function fetchCoop() {
+      if (!profile?.id) return;
+      const { data } = await supabase
+        .from("cooperatives")
+        .select("*")
+        .eq("admin_id", profile.id)
+        .maybeSingle();
+      if (data) setCooperative(data);
+      else setLoading(false); // no cooperative found, stop loading
     }
+    fetchCoop();
+  }, [profile]);
+
+  useEffect(() => {
+    if (cooperative?.id) loadMembers();
   }, [cooperative]);
 
   async function loadMembers() {
@@ -946,73 +939,47 @@ async function fetchCoop() {
     const { data, error } = await supabase
       .from("cooperative_members")
       .select("*")
-      .eq("cooperative_id", cooperative.id); // 👈 Filter strictly for your members
-    
-    if (!error && data) {
-      setMembers(data);
-    }
+      .eq("cooperative_id", cooperative.id);
+    if (!error && data) setMembers(data);
     setLoading(false);
   }
- async function addMember() {
-    if (!form.name || !form.phone) {
-      alert("Please enter a name and phone number.");
-      return;
-    }
 
-    try {
-      let trueCooperativeId = cooperative?.id;
-
-      // SAFETY NET: If state doesn't have the ID, query the database directly using the admin's profile ID
-      if (!trueCooperativeId && profile?.id) {
-        const { data: foundCoop, error: fetchError } = await supabase
-          .from("cooperatives")
-          .select("id")
-          .eq("admin_id", profile.id)
-          .maybeSingle();
-
-        if (foundCoop) {
-          trueCooperativeId = foundCoop.id;
-        }
-      }
-
-      // ULTIMATE FALLBACK: Hardcoded to your verified active cooperative row ID as a final shield
-      if (!trueCooperativeId) {
-        trueCooperativeId = "8752cb93-908b-4c01-b1df-ad3fcf007728";
-      }
-
-      // Now run the insert with a guaranteed valid UUID string
-      const { data, error } = await supabase
-        .from("cooperative_members")
-        .insert({
-          name: form.name,
-          phone: form.phone,
-          county: form.county || profile.county || "Embu",
-          variety: form.variety || "Hass",
-          expected_kg: Number(form.expected_kg) || 0,
-          cooperative_id:33688f54-ccbc-43a4-9a4e-d4c1bddabd6a // 👈 Guaranteed to be a valid matching foreign key now
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Update local state smoothly
-      if (data) {
-        setMembers(prev => [data, ...prev]);
-      }
-      
-      // Reset form fields
-      setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
-      setShowAdd(false);
-      
-      if (typeof loadMembers === "function") {
-        loadMembers();
-      }
-
-    } catch (err) {
-      alert("Database Error: " + err.message);
-    }
+  async function addMember() {
+  if (!form.name || !form.phone) {
+    alert("Please enter a name and phone number.");
+    return;
   }
+
+  const { data: foundCoop, error: coopErr } = await supabase
+    .from("cooperatives")
+    .select("id")
+    .eq("admin_id", profile.id)
+    .maybeSingle();
+
+  if (coopErr || !foundCoop) {
+    alert("Could not find your cooperative. Make sure admin_id matches your profile ID.");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("cooperative_members")
+    .insert({
+      name: form.name,
+      phone: form.phone,
+      county: form.county || profile.county,
+      variety: form.variety || "Hass",
+      expected_kg: Number(form.expected_kg) || 0,
+      cooperative_id: foundCoop.id,
+    })
+    .select()
+    .single();
+
+  if (error) { alert("Error: " + error.message); return; }
+
+  setMembers(prev => [data, ...prev]);
+  setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
+  setShowAdd(false);
+}
 
   async function deleteMember(id) {
     if (!confirm("Remove this member?")) return;
@@ -1040,7 +1007,6 @@ async function fetchCoop() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 28 }}>
         {[["👥 Members", members.length, "registered"], ["🧺 Total kg", totalKg.toLocaleString(), "expected harvest"], ["📍 County", profile.county, "base location"]].map(([icon, value, sub]) => (
           <div key={sub} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
@@ -1051,7 +1017,6 @@ async function fetchCoop() {
         ))}
       </div>
 
-      {/* Members list */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600 }}>Members</h2>
         <span style={{ fontSize: 13, color: t.textMuted }}>{members.length} members · {totalKg.toLocaleString()} kg total</span>
@@ -1086,7 +1051,6 @@ async function fetchCoop() {
         </div>
       ))}
 
-      {/* Combined listing CTA */}
       {members.length > 0 && (
         <div style={{ marginTop: 20, padding: 20, background: `linear-gradient(135deg, ${t.greenLight}, ${t.brownLight})`, borderRadius: 14, border: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Ready to list as a cooperative?</div>
@@ -1097,7 +1061,6 @@ async function fetchCoop() {
         </div>
       )}
 
-      {/* Add Member Modal */}
       {showAdd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
           <div style={{ background: t.white, borderRadius: 16, padding: 24, width: "100%", maxWidth: 440 }}>
@@ -1173,7 +1136,7 @@ export default function App() {
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
         {pageName === "coop-dashboard" && profile?.role === "cooperative" && <CoopDashboard profile={profile} setPage={setPage} />}
- {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
+        {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
