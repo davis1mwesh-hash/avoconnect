@@ -918,7 +918,7 @@ export default function App() {
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
- {pageName === "admin" && profile?.phone === "07XXXXXXXX" && <AdminPage profile={profile} />}
+ {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
