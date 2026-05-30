@@ -27,7 +27,6 @@ const t = {
   border: "#E2DDD6",
   shadow: "0 2px 12px rgba(0,0,0,.06)",
   shadowHover: "0 8px 24px rgba(0,0,0,.10)",
-  // FIX 1: Added missing amber colors used in ListingDetail
   amberLight: "#FEF3C7",
   amberDark: "#92400E",
 };
@@ -47,7 +46,6 @@ const css = `
 
 const COUNTIES = ["Nakuru","Nairobi","Kiambu","Murang'a","Nyeri","Meru","Kirinyaga","Embu","Kisii","Bomet","Nandi","Uasin Gishu"];
 const VARIETIES = ["Hass","Fuerte","Jumbo","Pinkerton","Reed","Kienyeji"];
-const BUYER_TYPES = ["Local trader","Packhouse","Exporter","Supermarket","International importer"];
 const STATUS_COLORS = {
   pending:   { bg: "#FEF3C7", text: "#92400E" },
   accepted:  { bg: "#D1FAE5", text: "#065F46" },
@@ -69,7 +67,6 @@ function NotificationBell({ profile }) {
   useEffect(() => {
     if (!profile) return;
     loadNotifications();
-
     const channel = supabase
       .channel("notifications:" + profile.id)
       .on("postgres_changes", {
@@ -81,7 +78,6 @@ function NotificationBell({ profile }) {
         setNotifications(prev => [payload.new, ...prev]);
       })
       .subscribe();
-
     return () => supabase.removeChannel(channel);
   }, [profile]);
 
@@ -162,7 +158,6 @@ function NotificationBell({ profile }) {
               </button>
             )}
           </div>
-
           <div style={{ overflowY: "auto", flex: 1 }}>
             {notifications.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center" }}>
@@ -184,9 +179,7 @@ function NotificationBell({ profile }) {
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>
-                      {n.title}
-                    </div>
+                    <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>{n.title}</div>
                     <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
                     <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
                   </div>
@@ -223,29 +216,27 @@ function Nav({ setPage, profile, onSignOut }) {
               👋 {profile.name.split(" ")[0]}
             </div>
             <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
-        {profile.role === "farmer" && (
-  <>
-    <button onClick={() => setPage("dashboard")} ...>Dashboard</button>
-    <button onClick={() => setPage("diary")} ...>Farm Diary</button>
-    {profile.verified && !profile.suspended && (
-      <button onClick={() => setPage("list")} ...>+ List avocados</button>
-    )}
-  </>
-)}
+            {profile.role === "farmer" && (
+              <>
+                <button onClick={() => setPage("dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Dashboard</button>
+                <button onClick={() => setPage("diary")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Farm Diary</button>
+                {profile.verified && !profile.suspended && (
+                  <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
+                )}
+              </>
+            )}
             {profile.role === "cooperative" && (
-  <>
-    <button onClick={() => setPage("coop-dashboard")} ...>My Cooperative</button>
-    {profile.verified && !profile.suspended && (
-      <button onClick={() => setPage("list")} ...>+ List avocados</button>
-    )}
-  </>
-)}
+              <>
+                <button onClick={() => setPage("coop-dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>My Cooperative</button>
+                {profile.verified && !profile.suspended && (
+                  <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
+                )}
+              </>
+            )}
             {profile.role === "company" && (
               <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
             )}
             <NotificationBell profile={profile} />
-            {/* FIX 2: Was `{0710701013 && ...}` — a truthy number, showing Admin to everyone.
-                      Now correctly checks the logged-in user's phone number. */}
             {profile.phone === "0710701013" && (
               <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
             )}
@@ -271,20 +262,22 @@ function Home({ setPage }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-async function load() {
-  let query = supabase
-    .from("listings")
-    .select("*, profiles!inner(name, phone, county, suspended, verified)")
-    .eq("is_active", true)
-    .eq("profiles.suspended", false)
-    .eq("profiles.verified", true)
-    .order("created_at", { ascending: false });
-  if (variety !== "All") query = query.eq("variety", variety);
-  const { data } = await query;
-  setListings(data || []);
-  setLoading(false);
-}
-load();
+    async function load() {
+      let query = supabase
+        .from("listings")
+        .select("*, profiles!inner(name, phone, county, suspended, verified)")
+        .eq("is_active", true)
+        .eq("profiles.suspended", false)
+        .eq("profiles.verified", true)
+        .order("created_at", { ascending: false });
+      if (variety !== "All") query = query.eq("variety", variety);
+      const { data } = await query;
+      setListings(data || []);
+      setLoading(false);
+    }
+    load();
+  }, [variety]);
+
   const filtered = listings.filter(l =>
     l.county?.toLowerCase().includes(search.toLowerCase()) ||
     l.variety?.toLowerCase().includes(search.toLowerCase()) ||
@@ -293,7 +286,6 @@ load();
 
   return (
     <div>
-      {/* Hero */}
       <div style={{ background: `linear-gradient(135deg, ${t.greenDark} 0%, ${t.green} 60%, ${t.greenMid} 100%)`, padding: "56px 24px 48px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -40, right: -40, width: 300, height: 300, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
         <div style={{ position: "absolute", bottom: -60, left: -20, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
@@ -310,7 +302,6 @@ load();
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by county, variety or farmer name…"
               style={{ flex: 1, minWidth: 240, padding: "13px 18px", border: "none", borderRadius: 12, fontSize: 14, background: "rgba(255,255,255,.95)", color: t.text, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }} />
-            {/* FIX 3: Added explicit value="" on the "All" option so variety state matches correctly */}
             <select value={variety} onChange={e => setVariety(e.target.value)}
               style={{ padding: "13px 16px", border: "none", borderRadius: 12, fontSize: 14, background: "rgba(255,255,255,.95)", color: t.text, boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
               <option value="All">All varieties</option>
@@ -320,7 +311,6 @@ load();
         </div>
       </div>
 
-      {/* Stats bar */}
       <div style={{ background: t.brownLight, borderBottom: `1px solid ${t.border}` }}>
         <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
           {[["🌱 1,240+", "Registered farmers"], ["🏪 84", "Verified buyers"], ["📈 Ksh 28–38", "Price range today /kg"]].map(([val, label]) => (
@@ -332,7 +322,6 @@ load();
         </div>
       </div>
 
-      {/* Listings */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "32px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 className="serif" style={{ fontSize: 22, color: t.text }}>Available now <span style={{ fontSize: 14, color: t.textMuted, fontFamily: "Inter" }}>({filtered.length} listings)</span></h2>
@@ -393,7 +382,7 @@ function ListingDetail({ listing: l, setPage, profile }) {
     if (profile.role === "farmer") { setError("Farmers cannot place orders. Switch to a buyer account."); return; }
     setLoading(true);
     const { data: buyerProfile } = await supabase.from("profiles").select("suspended, verified").eq("id", profile.id).single();
-    if (buyerProfile?.suspended) { setError("Your account is suspended due to no-shows. Contact support."); setLoading(false); return; }
+    if (buyerProfile?.suspended) { setError("Your account is suspended. Contact support."); setLoading(false); return; }
     if (!buyerProfile?.verified) { setError("Your account is pending verification. You can place orders once approved."); setLoading(false); return; }
     const { error } = await supabase.from("orders").insert({
       listing_id: l.id, farmer_id: l.farmer_id, buyer_id: profile.id,
@@ -441,7 +430,6 @@ function ListingDetail({ listing: l, setPage, profile }) {
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 20 }}>
-            {/* FIX 4: t.amberLight / t.amberDark were undefined — now defined in theme object */}
             {profile?.role === "farmer" && (
               <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
                 <p style={{ fontSize: 13, color: t.amberDark, fontWeight: 500 }}>🌱 You are logged in as a farmer. Only buyers can place orders.</p>
@@ -517,25 +505,13 @@ function FarmerDashboard({ setPage, profile }) {
         const remaining = (listing.quantity_kg || 0) - (order.quantity_kg || 0);
         const shouldDeactivate = remaining <= 0;
         const newQty = Math.max(0, remaining);
-
-        await supabase.from("listings").update({
-          quantity_kg: newQty,
-          is_active: !shouldDeactivate,
-        }).eq("id", listing.id);
-
-        setListings(prev => prev.map(l =>
-          l.id === listing.id
-            ? { ...l, quantity_kg: newQty, is_active: !shouldDeactivate }
-            : l
-        ));
+        await supabase.from("listings").update({ quantity_kg: newQty, is_active: !shouldDeactivate }).eq("id", listing.id);
+        setListings(prev => prev.map(l => l.id === listing.id ? { ...l, quantity_kg: newQty, is_active: !shouldDeactivate } : l));
       }
-
       const varietyName = order.listings?.variety || "avocados";
       const totalKsh = (order.quantity_kg * order.price_per_kg).toLocaleString();
       await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "accepted",
-        title: "Order accepted! ✅",
+        user_id: order.buyer_id, type: "accepted", title: "Order accepted! ✅",
         message: `${profile.name} accepted your order for ${order.quantity_kg} kg of ${varietyName} (Ksh ${totalKsh}). They will contact you shortly.`,
       });
     }
@@ -543,9 +519,7 @@ function FarmerDashboard({ setPage, profile }) {
     if (status === "rejected") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "rejected",
-        title: "Order declined ❌",
+        user_id: order.buyer_id, type: "rejected", title: "Order declined ❌",
         message: `${profile.name} was unable to fulfil your order for ${order.quantity_kg} kg of ${varietyName}. You can browse other listings on the marketplace.`,
       });
     }
@@ -553,9 +527,7 @@ function FarmerDashboard({ setPage, profile }) {
     if (status === "completed") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "completed",
-        title: "Order completed 🎉",
+        user_id: order.buyer_id, type: "completed", title: "Order completed 🎉",
         message: `Your order of ${order.quantity_kg} kg of ${varietyName} from ${profile.name} has been marked as completed. Thank you for trading on AvoConnect!`,
       });
     }
@@ -652,9 +624,7 @@ function FarmerDashboard({ setPage, profile }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 10px", borderRadius: 99, fontWeight: 500 }}>{l.variety}</span>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? "#D1FAE5" : "#F3F4F6", color: l.is_active ? "#065F46" : t.textMuted }}>{l.is_active ? "● Active" : "● Hidden"}</span>
-                    {l.quantity_kg === 0 && (
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>
-                    )}
+                    {l.quantity_kg === 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>}
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{l.quantity_kg?.toLocaleString()} kg · Ksh {l.price_per_kg}/kg</div>
                   <div style={{ fontSize: 12, color: t.textMuted }}>Harvest: {l.harvest_date} · {l.certification}</div>
@@ -731,7 +701,12 @@ function Signup({ setPage, setProfile }) {
     const email = `u${form.phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
     const { data, error: e1 } = await supabase.auth.signUp({ email, password: form.password });
     if (e1) { setError(e1.message); setLoading(false); return; }
-    const { error: e2 } = await supabase.from("profiles").insert({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role, buyer_type: form.buyerType || null, reg_number: form.reg_number || null, kra_pin: form.kra_pin || null, member_count: Number(form.member_count) || null, verified: role === "farmer" ? true : false });
+    const { error: e2 } = await supabase.from("profiles").insert({
+      id: data.user.id, name: form.name, phone: form.phone, county: form.county, role,
+      buyer_type: form.buyerType || null, reg_number: form.reg_number || null,
+      kra_pin: form.kra_pin || null, member_count: Number(form.member_count) || null,
+      verified: role === "farmer" ? true : false,
+    });
     if (e2) { setError(e2.message); setLoading(false); return; }
     setProfile({ id: data.user.id, name: form.name, phone: form.phone, county: form.county, role });
     setPage(role === "farmer" ? "dashboard" : role === "cooperative" ? "coop-dashboard" : "home");
@@ -814,7 +789,6 @@ function Login({ setPage, setProfile }) {
     if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
     const { data: p } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
     setProfile(p);
-    // FIX 5: Cooperatives now correctly redirect to their dashboard on login
     if (p.role === "farmer") setPage("dashboard");
     else if (p.role === "cooperative") setPage("coop-dashboard");
     else if (p.role === "company") setPage("company-dashboard");
@@ -855,41 +829,28 @@ function ListForm({ setPage, profile }) {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-async function submit() {
-  if (!form.quantity_kg || !form.price_per_kg || !form.harvest_date) {
-    setError("Please fill quantity, price, and harvest date.");
-    return;
-  }
 
-  // Check verification and suspension status
-  const { data: p } = await supabase
-    .from("profiles")
-    .select("verified, suspended")
-    .eq("id", profile.id)
-    .single();
-
-  if (p?.suspended) {
-    setError("Your account is suspended. Contact support.");
-    return;
+  async function submit() {
+    if (!form.quantity_kg || !form.price_per_kg || !form.harvest_date) {
+      setError("Please fill quantity, price, and harvest date.");
+      return;
+    }
+    const { data: p } = await supabase.from("profiles").select("verified, suspended").eq("id", profile.id).single();
+    if (p?.suspended) { setError("Your account is suspended. Contact support."); return; }
+    if (!p?.verified) { setError("Your account is pending verification. You can list once approved."); return; }
+    setLoading(true);
+    const { error } = await supabase.from("listings").insert({
+      ...form,
+      quantity_kg: Number(form.quantity_kg),
+      price_per_kg: Number(form.price_per_kg),
+      farmer_id: profile.id,
+      county: profile.county,
+      is_active: true,
+    });
+    setLoading(false);
+    if (error) { setError(error.message); return; }
+    setDone(true);
   }
-  if (!p?.verified) {
-    setError("Your account is pending verification. You can list once approved.");
-    return;
-  }
-
-  setLoading(true);
-  const { error } = await supabase.from("listings").insert({
-    ...form,
-    quantity_kg: Number(form.quantity_kg),
-    price_per_kg: Number(form.price_per_kg),
-    farmer_id: profile.id,
-    county: profile.county,
-    is_active: true,
-  });
-  setLoading(false);
-  if (error) { setError(error.message); return; }
-  setDone(true);
-}
 
   if (done) return (
     <div style={{ maxWidth: 440, margin: "80px auto", padding: 32, textAlign: "center" }}>
