@@ -66,47 +66,42 @@ export default function CoopDashboard({ profile }) {
     setLoading(false);
   }
 
-  async function handleAddMember(e) {
-    e.preventDefault();
-    if (!name || !phone || !county) {
-      setError("Please fill out all required fields.");
-      return;
-    }
-    if (!cooperative) {
-      setError("No active cooperative profile found for this account.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-
-    // 💡 THE CRITICAL FIX: Injected the cooperative_id row parameter right here
-    const { data, error: insertError } = await supabase
-      .from("cooperative_members")
-      .insert([
-        {
-          cooperative_id: cooperative.id, 
-          name,
-          phone,
-          county,
-          variety,
-          expected_kg: Number(expectedKg) || 0,
-        },
-      ]);
-
-    setSaving(false);
-
-    if (insertError) {
-      setError(insertError.message);
-    } else {
-      // Clear form inputs and refresh list
-      setName("");
-      setPhone("");
-      setExpectedKg("");
-      setShowForm(false);
-      loadCooperativeData();
-    }
+  async function addMember() {
+  if (!form.name || !form.phone) {
+    alert("Please enter name and phone.");
+    return;
   }
+
+  const { data: foundCoop, error: coopErr } = await supabase
+    .from("cooperatives")
+    .select("id")
+    .eq("admin_id", profile.id)
+    .maybeSingle();
+
+  if (coopErr || !foundCoop) {
+    alert("Could not find your cooperative.");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("cooperative_members")
+    .insert({
+      name: form.name,
+      phone: form.phone,
+      county: form.county || profile.county,
+      variety: form.variety || "Hass",
+      expected_kg: Number(form.expected_kg) || 0,
+      cooperative_id: foundCoop.id,
+    })
+    .select()
+    .single();
+
+  if (error) { alert("Error: " + error.message); return; }
+
+  setMembers(prev => [data, ...prev]);
+  setForm({ name: "", phone: "", county: "", expected_kg: "", variety: "Hass" });
+  setShowAdd(false);
+}
 
   async function deleteMember(id) {
     if (!confirm("Remove this member from the cooperative?")) return;
