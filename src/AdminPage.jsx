@@ -46,6 +46,16 @@ function StatCard({ icon, label, value, color }) {
 function Badge({ label, bg, color }) {
   return <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: bg, color, fontWeight: 500 }}>{label}</span>;
 }
+function RoleBadge({ role }) {
+  const map = {
+    farmer:      { label: "🌱 Farmer",      bg: t.greenLight,  color: t.greenDark },
+    buyer:       { label: "🏪 Buyer",        bg: "#DBEAFE",     color: "#1E40AF"   },
+    cooperative: { label: "🤝 Cooperative",  bg: t.amberLight,  color: "#92400E"   },
+    company:     { label: "🏢 Company",      bg: t.purpleLight, color: t.purple    },
+  };
+  const r = map[role] || { label: role, bg: "#f0f0f0", color: t.textMuted };
+  return <Badge label={r.label} bg={r.bg} color={r.color} />;
+}
 
 function TrustBar({ score }) {
   const pct = Math.min(100, Math.max(0, score));
@@ -121,11 +131,7 @@ function PendingTab({ onAction }) {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ fontWeight: 600, fontSize: 16 }}>{u.name}</span>
-                <Badge
-                  label={u.role === "farmer" ? "🌱 Farmer" : "🏪 Buyer"}
-                  bg={u.role === "farmer" ? t.greenLight : t.blueLight || "#DBEAFE"}
-                  color={u.role === "farmer" ? t.greenDark : "#1E40AF"}
-                />
+<RoleBadge role={u.role} />
               </div>
               <div style={{ fontSize: 13, color: t.textMuted, display: "flex", gap: 16, flexWrap: "wrap" }}>
                 <span>📞 {u.phone}</span>
@@ -283,11 +289,7 @@ function UsersTab() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>{u.name}</span>
-                  <Badge
-                    label={u.role === "farmer" ? "🌱 Farmer" : "🏪 Buyer"}
-                    bg={u.role === "farmer" ? t.greenLight : "#DBEAFE"}
-                    color={u.role === "farmer" ? t.greenDark : "#1E40AF"}
-                  />
+                 <RoleBadge role={u.role} />
                   {verificationBadge(u)}
                   {u.strikes > 0 && <Badge label={`⚠️ ${u.strikes} strike${u.strikes > 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />}
                 </div>
