@@ -507,7 +507,7 @@ function ResourcesTab() {
     setLoading(true);
     const { data } = await supabase
       .from("resources")
-      .select("*, profiles(name, company_name, phone)")
+      .select("*, profiles!resources_company_id_fkey(name, company_name, phone)")
       .eq("status", filter)
       .order("created_at", { ascending: false });
     setResources(data || []);

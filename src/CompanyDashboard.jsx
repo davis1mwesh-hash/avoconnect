@@ -67,10 +67,10 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
       setUploading(true);
       const ext = photoFile.name.split(".").pop();
       const path = `resources/${profile.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("farm-photos").upload(path, photoFile, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("resources").upload(path, photoFile, { upsert: true });
       setUploading(false);
       if (upErr) { setError("Photo upload failed: " + upErr.message); setSaving(false); return; }
-      const { data: urlData } = supabase.storage.from("farm-photos").getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from("resources").getPublicUrl(path);
       photo_url = urlData.publicUrl;
     }
 
