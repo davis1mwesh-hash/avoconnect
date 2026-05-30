@@ -223,19 +223,23 @@ function Nav({ setPage, profile, onSignOut }) {
               👋 {profile.name.split(" ")[0]}
             </div>
             <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
-            {profile.role === "farmer" && (
-              <>
-                <button onClick={() => setPage("dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Dashboard</button>
-                <button onClick={() => setPage("diary")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Farm Diary</button>
-                <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
-              </>
-            )}
+        {profile.role === "farmer" && (
+  <>
+    <button onClick={() => setPage("dashboard")} ...>Dashboard</button>
+    <button onClick={() => setPage("diary")} ...>Farm Diary</button>
+    {profile.verified && !profile.suspended && (
+      <button onClick={() => setPage("list")} ...>+ List avocados</button>
+    )}
+  </>
+)}
             {profile.role === "cooperative" && (
-              <>
-                <button onClick={() => setPage("coop-dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>My Cooperative</button>
-                <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
-              </>
-            )}
+  <>
+    <button onClick={() => setPage("coop-dashboard")} ...>My Cooperative</button>
+    {profile.verified && !profile.suspended && (
+      <button onClick={() => setPage("list")} ...>+ List avocados</button>
+    )}
+  </>
+)}
             {profile.role === "company" && (
               <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
             )}
@@ -267,16 +271,20 @@ function Home({ setPage }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      let query = supabase.from("listings").select("*, profiles(name, phone, county)").eq("is_active", true).order("created_at", { ascending: false });
-      if (variety !== "All") query = query.eq("variety", variety);
-      const { data } = await query;
-      setListings(data || []);
-      setLoading(false);
-    }
-    load();
-  }, [variety]);
-
+async function load() {
+  let query = supabase
+    .from("listings")
+    .select("*, profiles!inner(name, phone, county, suspended, verified)")
+    .eq("is_active", true)
+    .eq("profiles.suspended", false)
+    .eq("profiles.verified", true)
+    .order("created_at", { ascending: false });
+  if (variety !== "All") query = query.eq("variety", variety);
+  const { data } = await query;
+  setListings(data || []);
+  setLoading(false);
+}
+load();
   const filtered = listings.filter(l =>
     l.county?.toLowerCase().includes(search.toLowerCase()) ||
     l.variety?.toLowerCase().includes(search.toLowerCase()) ||
@@ -847,15 +855,41 @@ function ListForm({ setPage, profile }) {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  async function submit() {
-    if (!form.quantity_kg || !form.price_per_kg || !form.harvest_date) { setError("Please fill quantity, price, and harvest date."); return; }
-    setLoading(true);
-    const { error } = await supabase.from("listings").insert({ ...form, quantity_kg: Number(form.quantity_kg), price_per_kg: Number(form.price_per_kg), farmer_id: profile.id, county: profile.county, is_active: true });
-    setLoading(false);
-    if (error) { setError(error.message); return; }
-    setDone(true);
+async function submit() {
+  if (!form.quantity_kg || !form.price_per_kg || !form.harvest_date) {
+    setError("Please fill quantity, price, and harvest date.");
+    return;
   }
+
+  // Check verification and suspension status
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("verified, suspended")
+    .eq("id", profile.id)
+    .single();
+
+  if (p?.suspended) {
+    setError("Your account is suspended. Contact support.");
+    return;
+  }
+  if (!p?.verified) {
+    setError("Your account is pending verification. You can list once approved.");
+    return;
+  }
+
+  setLoading(true);
+  const { error } = await supabase.from("listings").insert({
+    ...form,
+    quantity_kg: Number(form.quantity_kg),
+    price_per_kg: Number(form.price_per_kg),
+    farmer_id: profile.id,
+    county: profile.county,
+    is_active: true,
+  });
+  setLoading(false);
+  if (error) { setError(error.message); return; }
+  setDone(true);
+}
 
   if (done) return (
     <div style={{ maxWidth: 440, margin: "80px auto", padding: 32, textAlign: "center" }}>
