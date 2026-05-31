@@ -84,6 +84,16 @@ const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
       photo_url = urlData.publicUrl;
     }
 
+    let pdf_url = form.pdf_url || "";
+if (pdfFile) {
+  const ext = pdfFile.name.split(".").pop();
+  const path = `resources/${profile.id}/docs/${Date.now()}.${ext}`;
+  const { error: pdfErr } = await supabase.storage.from("resources").upload(path, pdfFile, { upsert: true });
+  if (pdfErr) { setError("PDF upload failed: " + pdfErr.message); setSaving(false); return; }
+  const { data: pdfUrlData } = supabase.storage.from("resources").getPublicUrl(path);
+  pdf_url = pdfUrlData.publicUrl;
+}
+
     const payload = { ...form, photo_url, pdf_url, company_id: profile.id, status: "pending" };
     let error;
     if (editing?.id) {
@@ -193,15 +203,6 @@ const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
         )}
       </div>
 
-let pdf_url = form.pdf_url || "";
-if (pdfFile) {
-  const ext = pdfFile.name.split(".").pop();
-  const path = `resources/${profile.id}/docs/${Date.now()}.${ext}`;
-  const { error: pdfErr } = await supabase.storage.from("resources").upload(path, pdfFile, { upsert: true });
-  if (pdfErr) { setError("PDF upload failed: " + pdfErr.message); setSaving(false); return; }
-  const { data: pdfUrlData } = supabase.storage.from("resources").getPublicUrl(path);
-  pdf_url = pdfUrlData.publicUrl;
-}
 
 {/* PDF / Book upload */}
 <div style={{ marginBottom: 20 }}>
