@@ -33,13 +33,15 @@ function Tag({ label, bg, color }) {
   return <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: bg, color, fontWeight: 500 }}>{label}</span>;
 }
 
-function ResourceCard({ resource }) {
+function ResourceCard({ resource, onClick }) {
   const ts = TYPE_STYLES[resource.type] || TYPE_STYLES.input;
   const [imgError, setImgError] = useState(false);
   const companyName = resource.profiles?.company_name || resource.company_name || "—";
 
   return (
-    <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 18, overflow: "hidden", boxShadow: t.shadow, transition: "box-shadow .2s, transform .2s", display: "flex", flexDirection: "column" }}
+    <div
+      onClick={onClick}
+      style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 18, overflow: "hidden", boxShadow: t.shadow, transition: "box-shadow .2s, transform .2s", display: "flex", flexDirection: "column", cursor: "pointer" }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = t.shadowHover; e.currentTarget.style.transform = "translateY(-2px)"; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = t.shadow; e.currentTarget.style.transform = "none"; }}>
       {resource.photo_url && !imgError ? (
@@ -66,6 +68,7 @@ function ResourceCard({ resource }) {
         )}
         {resource.type === "link" && resource.external_url && (
           <a href={resource.external_url} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
             style={{ fontSize: 12, color: t.blue, marginBottom: 12, display: "block", wordBreak: "break-all" }}>
             🔗 {resource.external_url.replace(/^https?:\/\//, "").substring(0, 45)}
           </a>
@@ -74,20 +77,112 @@ function ResourceCard({ resource }) {
           {resource.whatsapp && (
             <a href={`https://wa.me/${resource.whatsapp.replace(/\D/g, "")}?text=Hi, I found your listing on AvoConnect: ${encodeURIComponent(resource.title)}`}
               target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
               style={{ flex: 1, padding: "9px 0", background: "#25D366", color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
               💬 WhatsApp
             </a>
           )}
           {resource.phone && (
             <a href={`tel:${resource.phone}`}
+              onClick={e => e.stopPropagation()}
               style={{ flex: 1, padding: "9px 0", background: "none", color: t.green, border: `1.5px solid ${t.green}`, borderRadius: 10, fontSize: 13, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
               📞 Call
             </a>
           )}
           {resource.type === "link" && resource.external_url && (
             <a href={resource.external_url} target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
               style={{ flex: 1, padding: "9px 0", background: "#DBEAFE", color: "#1E40AF", borderRadius: 10, fontSize: 13, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
               🔗 Open
+            </a>
+          )}
+          {resource.pdf_url && (
+            <a href={resource.pdf_url} target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ flex: 1, padding: "9px 0", background: "#EDE9FE", color: "#6D28D9", borderRadius: 10, fontSize: 13, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+              📄 PDF
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResourceModal({ resource, onClose }) {
+  const ts = TYPE_STYLES[resource.type] || TYPE_STYLES.input;
+  const companyName = resource.profiles?.company_name || resource.company_name || "—";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: t.white, borderRadius: 20, padding: 28, maxWidth: 560, width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.2)" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Tag label={`${ts.icon} ${ts.label}`} bg={ts.bg} color={ts.color} />
+            {resource.category && <Tag label={resource.category} bg={t.brownLight} color={t.brown} />}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Photo */}
+        {resource.photo_url && (
+          <img src={resource.photo_url} alt={resource.title}
+            style={{ width: "100%", borderRadius: 12, marginBottom: 16, maxHeight: 260, objectFit: "cover" }} />
+        )}
+
+        {/* Title & company */}
+        <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: 24, marginBottom: 6, color: t.text }}>{resource.title}</h2>
+        <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 16 }}>🏢 {companyName}</p>
+
+        {/* Description */}
+        {resource.description && (
+          <p style={{ fontSize: 14, color: t.text, lineHeight: 1.8, marginBottom: 16 }}>{resource.description}</p>
+        )}
+
+        {/* Price */}
+        {resource.price && (
+          <div style={{ fontSize: 20, fontWeight: 700, color: t.greenDark, marginBottom: 16 }}>{resource.price}</div>
+        )}
+
+        {/* External URL */}
+        {resource.external_url && (
+          <a href={resource.external_url} target="_blank" rel="noopener noreferrer"
+            style={{ display: "block", fontSize: 13, color: t.blue, marginBottom: 16, wordBreak: "break-all" }}>
+            🔗 {resource.external_url}
+          </a>
+        )}
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {resource.whatsapp && (
+            <a href={`https://wa.me/${resource.whatsapp.replace(/\D/g, "")}?text=Hi, I found your listing on AvoConnect: ${encodeURIComponent(resource.title)}`}
+              target="_blank" rel="noopener noreferrer"
+              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: "#25D366", color: "#fff", borderRadius: 10, fontSize: 14, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              💬 WhatsApp
+            </a>
+          )}
+          {resource.phone && (
+            <a href={`tel:${resource.phone}`}
+              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: "none", color: t.green, border: `1.5px solid ${t.green}`, borderRadius: 10, fontSize: 14, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              📞 Call
+            </a>
+          )}
+          {resource.pdf_url && (
+            <a href={resource.pdf_url} target="_blank" rel="noopener noreferrer"
+              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: "#EDE9FE", color: "#6D28D9", borderRadius: 10, fontSize: 14, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              📄 Download PDF
+            </a>
+          )}
+          {resource.type === "link" && resource.external_url && (
+            <a href={resource.external_url} target="_blank" rel="noopener noreferrer"
+              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: "#DBEAFE", color: "#1E40AF", borderRadius: 10, fontSize: 14, fontWeight: 600, textAlign: "center", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              🔗 Open link
             </a>
           )}
         </div>
@@ -102,6 +197,7 @@ export default function Resources({ setPage, profile }) {
   const [activeType, setActiveType] = useState("all");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -209,7 +305,9 @@ export default function Resources({ setPage, profile }) {
           <>
             <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 20 }}>{filtered.length} resource{filtered.length !== 1 ? "s" : ""}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))", gap: 20 }}>
-              {filtered.map(r => <ResourceCard key={r.id} resource={r} />)}
+              {filtered.map(r => (
+                <ResourceCard key={r.id} resource={r} onClick={() => setSelected(r)} />
+              ))}
             </div>
           </>
         )}
@@ -226,6 +324,9 @@ export default function Resources({ setPage, profile }) {
           </button>
         </div>
       )}
+
+      {/* Detail Modal */}
+      {selected && <ResourceModal resource={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
