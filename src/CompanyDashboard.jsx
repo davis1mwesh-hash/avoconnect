@@ -48,6 +48,9 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef();
+  const pdfRef = useRef();
+const [pdfFile, setPdfFile] = useState(null);
+const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   function pickPhoto(e) {
@@ -56,6 +59,13 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   }
+
+  function pickPdf(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  setPdfFile(file);
+  setPdfName(file.name);
+}
 
   async function save() {
     if (!form.title) { setError("Title is required."); return; }
@@ -74,7 +84,7 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
       photo_url = urlData.publicUrl;
     }
 
-    const payload = { ...form, photo_url, company_id: profile.id, status: "pending" };
+    const payload = { ...form, photo_url, pdf_url, company_id: profile.id, status: "pending" };
     let error;
     if (editing?.id) {
       ({ error } = await supabase.from("resources").update(payload).eq("id", editing.id));
@@ -183,6 +193,44 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
         )}
       </div>
 
+let pdf_url = form.pdf_url || "";
+if (pdfFile) {
+  const ext = pdfFile.name.split(".").pop();
+  const path = `resources/${profile.id}/docs/${Date.now()}.${ext}`;
+  const { error: pdfErr } = await supabase.storage.from("resources").upload(path, pdfFile, { upsert: true });
+  if (pdfErr) { setError("PDF upload failed: " + pdfErr.message); setSaving(false); return; }
+  const { data: pdfUrlData } = supabase.storage.from("resources").getPublicUrl(path);
+  pdf_url = pdfUrlData.publicUrl;
+}
+
+{/* PDF / Book upload */}
+<div style={{ marginBottom: 20 }}>
+  <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>
+    PDF / Book (optional)
+  </label>
+  <div onClick={() => pdfRef.current.click()}
+    style={{ border: `2px dashed ${pdfName ? t.green : t.border}`, borderRadius: 12, padding: 16, cursor: "pointer", textAlign: "center", background: t.cream }}>
+    {pdfName ? (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <span style={{ fontSize: 28 }}>📄</span>
+        <span style={{ fontSize: 13, color: t.greenDark, fontWeight: 500 }}>{pdfName}</span>
+      </div>
+    ) : (
+      <div>
+        <div style={{ fontSize: 28, marginBottom: 4 }}>📄</div>
+        <div style={{ fontSize: 13, color: t.textMuted }}>Click to upload PDF or book</div>
+        <div style={{ fontSize: 11, color: t.textMuted }}>PDF, max 20MB</div>
+      </div>
+    )}
+  </div>
+  <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.epub" onChange={pickPdf} style={{ display: "none" }} />
+  {pdfName && (
+    <button onClick={() => { setPdfFile(null); setPdfName(""); }}
+      style={{ fontSize: 12, color: t.textMuted, background: "none", border: "none", cursor: "pointer", marginTop: 4 }}>
+      ✕ Remove file
+    </button>
+  )}
+</div>
       {/* Admin note preview */}
       <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
         <p style={{ fontSize: 12, color: "#92400E", lineHeight: 1.6 }}>
