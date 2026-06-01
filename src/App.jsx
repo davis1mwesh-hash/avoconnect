@@ -495,7 +495,6 @@ function FarmerDashboard({ setPage, profile }) {
   async function updateOrderStatus(orderId, status) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-
     await supabase.from("orders").update({ status }).eq("id", orderId);
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
 
@@ -515,7 +514,6 @@ function FarmerDashboard({ setPage, profile }) {
         message: `${profile.name} accepted your order for ${order.quantity_kg} kg of ${varietyName} (Ksh ${totalKsh}). They will contact you shortly.`,
       });
     }
-
     if (status === "rejected") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
@@ -523,7 +521,6 @@ function FarmerDashboard({ setPage, profile }) {
         message: `${profile.name} was unable to fulfil your order for ${order.quantity_kg} kg of ${varietyName}. You can browse other listings on the marketplace.`,
       });
     }
-
     if (status === "completed") {
       const varietyName = order.listings?.variety || "avocados";
       await supabase.from("notifications").insert({
@@ -691,18 +688,22 @@ function FarmerDashboard({ setPage, profile }) {
 // ── Signup ────────────────────────────────────────────────────
 function Signup({ setPage, setProfile }) {
   const [role, setRole] = useState("farmer");
-  const [form, setForm] = useState({ name: "", phone: "", county: "", password: "", buyerType: "" });
+  const [form, setForm] = useState({ name: "", phone: "", county: "", password: "", email: "", buyerType: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function submit() {
     if (!form.name || !form.phone || !form.county || !form.password) { setError("Please fill all fields."); return; }
     setLoading(true); setError("");
-    const email = `u${form.phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
-    const { data, error: e1 } = await supabase.auth.signUp({ email, password: form.password });
+    // Use real email if provided, otherwise generate from phone
+    const authEmail = form.email
+      ? form.email.trim().toLowerCase()
+      : `u${form.phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
+    const { data, error: e1 } = await supabase.auth.signUp({ email: authEmail, password: form.password });
     if (e1) { setError(e1.message); setLoading(false); return; }
     const { error: e2 } = await supabase.from("profiles").insert({
       id: data.user.id, name: form.name, phone: form.phone, county: form.county, role,
+      email: form.email || null,
       buyer_type: form.buyerType || null, reg_number: form.reg_number || null,
       kra_pin: form.kra_pin || null, member_count: Number(form.member_count) || null,
       verified: role === "farmer" ? true : false,
@@ -734,6 +735,10 @@ function Signup({ setPage, setProfile }) {
             <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder={label} style={inp} />
           </div>
         ))}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Email address <span style={{ color: t.textMuted, fontWeight: 400 }}>(for password reset)</span></label>
+          <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="your@email.com" style={inp} />
+        </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>County</label>
           <select value={form.county} onChange={e => setForm({ ...form, county: e.target.value })} style={inp}>
@@ -780,6 +785,10 @@ function Login({ setPage, setProfile }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [forgot, setForgot] = useState(false);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   async function login() {
     if (!phone || !password) { setError("Please fill all fields."); return; }
@@ -795,6 +804,59 @@ function Login({ setPage, setProfile }) {
     else setPage("home");
   }
 
+  async function sendReset() {
+    if (!resetPhone) { setError("Please enter your phone number."); return; }
+    setResetLoading(true); setError("");
+    const { data: p } = await supabase
+      .from("profiles")
+      .select("email, phone")
+      .eq("phone", resetPhone.trim())
+      .maybeSingle();
+
+    if (!p) { setError("No account found with that phone number."); setResetLoading(false); return; }
+
+    const resetEmail = p.email || `u${resetPhone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
+    await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: "https://avoconnect.vercel.app",
+    });
+    setResetLoading(false);
+    setResetSent(true);
+  }
+
+  if (forgot) return (
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
+      <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔑</div>
+        <h2 className="serif" style={{ fontSize: 28, marginBottom: 6 }}>Reset password</h2>
+        <p style={{ fontSize: 14, color: t.textMuted }}>Enter your phone number and we'll send a reset link to your email.</p>
+      </div>
+      <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow }}>
+        {resetSent ? (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+            <p style={{ fontSize: 15, color: t.text, marginBottom: 8, fontWeight: 500 }}>Reset link sent!</p>
+            <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 24, lineHeight: 1.6 }}>Check your email inbox for the password reset link. It may take a minute to arrive.</p>
+            <button onClick={() => { setForgot(false); setResetSent(false); setResetPhone(""); }} style={{ ...btn(t.green, t.white), width: "100%", padding: 13 }}>Back to login</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Phone number</label>
+              <input type="tel" value={resetPhone} onChange={e => setResetPhone(e.target.value)} placeholder="07XXXXXXXX" style={inp} />
+            </div>
+            {error && <p style={{ fontSize: 13, color: "#E24B4A", marginBottom: 12, padding: "10px 12px", background: "#FEF2F2", borderRadius: 8 }}>{error}</p>}
+            <button onClick={sendReset} disabled={resetLoading} style={{ ...btn(t.green, t.white), width: "100%", padding: 13, marginBottom: 12, opacity: resetLoading ? .7 : 1 }}>
+              {resetLoading ? "Sending…" : "Send reset link"}
+            </button>
+            <button onClick={() => { setForgot(false); setError(""); }} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), width: "100%", padding: 13 }}>
+              Back to login
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
       <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -807,9 +869,14 @@ function Login({ setPage, setProfile }) {
           <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Phone number</label>
           <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XXXXXXXX" style={inp} />
         </div>
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 8 }}>
           <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Password</label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" style={inp} />
+        </div>
+        <div style={{ textAlign: "right", marginBottom: 20 }}>
+          <span onClick={() => { setForgot(true); setError(""); }} style={{ fontSize: 12, color: t.green, cursor: "pointer", fontWeight: 500 }}>
+            Forgot password?
+          </span>
         </div>
         {error && <p style={{ fontSize: 13, color: "#E24B4A", marginBottom: 12, padding: "10px 12px", background: "#FEF2F2", borderRadius: 8 }}>{error}</p>}
         <button onClick={login} disabled={loading} style={{ ...btn(t.green, t.white), width: "100%", padding: 13, fontSize: 15, opacity: loading ? .7 : 1, marginBottom: 16 }}>
