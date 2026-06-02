@@ -804,19 +804,30 @@ function Login({ setPage, setProfile }) {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  async function login() {
-    if (!phone || !password) { setError("Please fill all fields."); return; }
-    setLoading(true); setError("");
-    const email = `u${phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
-    const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
-    if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
-    const { data: p } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
-    setProfile(p);
-    if (p.role === "farmer") setPage("dashboard");
-    else if (p.role === "cooperative") setPage("coop-dashboard");
-    else if (p.role === "company") setPage("company-dashboard");
-    else setPage("home");
-  }
+ async function login() {
+  if (!phone || !password) { setError("Please fill all fields."); return; }
+  setLoading(true); setError("");
+
+  // First check if user has a real email stored
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("phone", phone.trim())
+    .maybeSingle();
+
+  const authEmail = p?.email 
+    ? p.email 
+    : `u${phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
+
+  const { data, error: e } = await supabase.auth.signInWithPassword({ email: authEmail, password });
+  if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+  setProfile(profile);
+  if (profile.role === "farmer") setPage("dashboard");
+  else if (profile.role === "cooperative") setPage("coop-dashboard");
+  else if (profile.role === "company") setPage("company-dashboard");
+  else setPage("home");
+}
 
   async function sendReset() {
     if (!resetPhone) { setError("Please enter your phone number."); return; }
