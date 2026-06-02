@@ -677,27 +677,27 @@ function FarmerDashboard({ setPage, profile }) {
                   <button onClick={() => updateOrderStatus(o.id, "no_show")} style={{ ...btn("none", "#F59E0B", "1px solid #FCD34D"), flex: 1, padding: "9px", fontSize: 13 }}>⚠️ No-show</button>
                   <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), flex: 2, padding: "9px" }}>✓ Mark completed</button>
                 </div>
-                {o.status === "completed" && (
-  <button onClick={() => setReviewOrder(o)} style={{ ...btn(t.greenLight, t.greenDark, "none"), width: "100%", padding: "9px", fontSize: 13, marginTop: 8 }}>
-    ⭐ Leave review for buyer
-  </button>
-)}
+              )}
+              {o.status === "completed" && (
+                <button onClick={() => setReviewOrder(o)} style={{ ...btn(t.greenLight, t.greenDark, "none"), width: "100%", padding: "9px", fontSize: 13, marginTop: 8 }}>
+                  ⭐ Leave review for buyer
+                </button>
               )}
             </div>
           ))
         )
       }
+      {reviewOrder && (
+        <ReviewModal
+          order={reviewOrder}
+          profile={profile}
+          onClose={() => setReviewOrder(null)}
+          onSaved={() => setReviewOrder(null)}
+        />
+      )}
     </div>
   );
 }
-{reviewOrder && (
-  <ReviewModal
-    order={reviewOrder}
-    profile={profile}
-    onClose={() => setReviewOrder(null)}
-    onSaved={() => setReviewOrder(null)}
-  />
-)}
 
 // ── Signup ────────────────────────────────────────────────────
 function Signup({ setPage, setProfile }) {
@@ -983,13 +983,69 @@ function ListForm({ setPage, profile }) {
     </div>
   );
 }
+// ── Reset Password ────────────────────────────────────────────
+function ResetPassword({ setPage }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
+  async function submit() {
+    if (!password || !confirm) { setError("Please fill both fields."); return; }
+    if (password !== confirm) { setError("Passwords do not match."); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    setLoading(true); setError("");
+    const { error: e } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (e) { setError(e.message); return; }
+    setDone(true);
+    setTimeout(() => setPage("login"), 2500);
+  }
+
+  if (done) return (
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px", textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+      <h2 className="serif" style={{ fontSize: 28, marginBottom: 8 }}>Password updated!</h2>
+      <p style={{ fontSize: 14, color: t.textMuted }}>Redirecting you to login…</p>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
+      <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔑</div>
+        <h2 className="serif" style={{ fontSize: 28, marginBottom: 6 }}>Set new password</h2>
+        <p style={{ fontSize: 14, color: t.textMuted }}>Choose a strong password for your account.</p>
+      </div>
+      <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow }}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>New password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 6 characters" style={inp} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>Confirm password</label>
+          <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat your password" style={inp} />
+        </div>
+        {error && <p style={{ fontSize: 13, color: "#E24B4A", marginBottom: 12, padding: "10px 12px", background: "#FEF2F2", borderRadius: 8 }}>{error}</p>}
+        <button onClick={submit} disabled={loading} style={{ ...btn(t.green, t.white), width: "100%", padding: 13, fontSize: 15, opacity: loading ? .7 : 1 }}>
+          {loading ? "Updating…" : "Update password →"}
+        </button>
+      </div>
+    </div>
+  );
+}
 // ── App ───────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("home");
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
+    // Detect password reset token in URL
+  const hash = window.location.hash;
+  if (hash.includes("type=recovery")) {
+    setPage("reset-password");
+  }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
@@ -1022,6 +1078,7 @@ export default function App() {
         {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
+        {pageName === "reset-password" && <ResetPassword setPage={setPage} />}
         {pageName === "listing" && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
       </div>
     </>
