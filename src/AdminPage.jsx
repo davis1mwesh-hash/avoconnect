@@ -33,12 +33,23 @@ const TABS = [
 ];
  
 
-function StatCard({ icon, label, value, color }) {
+function StatCard({ icon, label, value, color, onClick }) {
   return (
-    <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: t.white, border: `1px solid ${t.border}`, borderRadius: 14,
+        padding: "18px 20px", boxShadow: t.shadow,
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow .2s, transform .2s",
+      }}
+      onMouseEnter={e => { if (onClick) { e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,.10)"; e.currentTarget.style.transform = "translateY(-2px)"; }}}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = t.shadow; e.currentTarget.style.transform = "none"; }}
+    >
       <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
       <div style={{ fontSize: 26, fontFamily: "Playfair Display, serif", color: color || t.green, marginBottom: 2 }}>{value}</div>
       <div style={{ fontSize: 13, color: t.textMuted }}>{label}</div>
+      {onClick && <div style={{ fontSize: 11, color: t.green, marginTop: 4, fontWeight: 500 }}>Click to view →</div>}
     </div>
   );
 }
