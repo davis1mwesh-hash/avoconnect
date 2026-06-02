@@ -469,6 +469,7 @@ function FarmerDashboard({ setPage, profile }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editListing, setEditListing] = useState(null);
+  const [reviewOrder, setReviewOrder] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -676,6 +677,11 @@ function FarmerDashboard({ setPage, profile }) {
                   <button onClick={() => updateOrderStatus(o.id, "no_show")} style={{ ...btn("none", "#F59E0B", "1px solid #FCD34D"), flex: 1, padding: "9px", fontSize: 13 }}>⚠️ No-show</button>
                   <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), flex: 2, padding: "9px" }}>✓ Mark completed</button>
                 </div>
+                {o.status === "completed" && (
+  <button onClick={() => setReviewOrder(o)} style={{ ...btn(t.greenLight, t.greenDark, "none"), width: "100%", padding: "9px", fontSize: 13, marginTop: 8 }}>
+    ⭐ Leave review for buyer
+  </button>
+)}
               )}
             </div>
           ))
@@ -684,6 +690,14 @@ function FarmerDashboard({ setPage, profile }) {
     </div>
   );
 }
+{reviewOrder && (
+  <ReviewModal
+    order={reviewOrder}
+    profile={profile}
+    onClose={() => setReviewOrder(null)}
+    onSaved={() => setReviewOrder(null)}
+  />
+)}
 
 // ── Signup ────────────────────────────────────────────────────
 function Signup({ setPage, setProfile }) {
