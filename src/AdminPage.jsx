@@ -31,7 +31,6 @@ const TABS = [
   { key: "resources", label: "🌿 Resources",   color: t.green },
   { key: "stats",     label: "📊 Stats",       color: t.purple },
 ];
- 
 
 function StatCard({ icon, label, value, color, onClick }) {
   return (
@@ -47,7 +46,7 @@ function StatCard({ icon, label, value, color, onClick }) {
       onMouseLeave={e => { e.currentTarget.style.boxShadow = t.shadow; e.currentTarget.style.transform = "none"; }}
     >
       <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 26, fontFamily: "Playfair Display, serif", color: color || t.green, marginBottom: 2 }}>{value}</div>
+      <div style={{ fontSize: 26, fontFamily: "Playfair Display, serif", color: color || t.green, marginBottom: 2 }}>{value ?? 0}</div>
       <div style={{ fontSize: 13, color: t.textMuted }}>{label}</div>
       {onClick && <div style={{ fontSize: 11, color: t.green, marginTop: 4, fontWeight: 500 }}>Click to view →</div>}
     </div>
@@ -57,10 +56,11 @@ function StatCard({ icon, label, value, color, onClick }) {
 function Badge({ label, bg, color }) {
   return <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: bg, color, fontWeight: 500 }}>{label}</span>;
 }
+
 function RoleBadge({ role }) {
   const map = {
     farmer:      { label: "🌱 Farmer",      bg: t.greenLight,  color: t.greenDark },
-    buyer:       { label: "🏪 Buyer",        bg: "#DBEAFE",     color: "#1E40AF"   },
+    buyer:       { label: "🏪 Buyer",       bg: "#DBEAFE",     color: "#1E40AF"   },
     cooperative: { label: "🤝 Cooperative",  bg: t.amberLight,  color: "#92400E"   },
     company:     { label: "🏢 Company",      bg: t.purpleLight, color: t.purple    },
   };
@@ -109,14 +109,13 @@ function PendingTab({ onAction }) {
       verification_note: notes[user.id] || "",
     }).eq("id", user.id);
 
-    // Notify user
     await supabase.from("notifications").insert({
       user_id: user.id,
       type: decision === "approved" ? "accepted" : "rejected",
       title: decision === "approved" ? "Account verified ✅" : "Verification rejected ❌",
       message: decision === "approved"
-        ? `Welcome to AvoConnect, ${user.name.split(" ")[0]}! Your account is verified and you can now ${user.role === "farmer" ? "list avocados and receive orders" : "place orders"}.`
-        : `Your verification was not approved. Reason: ${notes[user.id] || "Does not meet requirements"}. Contact support to reapply.`,
+        ? `Welcome to AvoConnect, ${user.name ? user.name.split(" ")[0] : "User"}! Your account is verified.`
+        : `Your verification was not approved. Reason: ${notes[user.id] || "Does not meet requirements"}.`,
     });
 
     setPending(p => p.filter(u => u.id !== user.id));
@@ -142,7 +141,7 @@ function PendingTab({ onAction }) {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ fontWeight: 600, fontSize: 16 }}>{u.name}</span>
-<RoleBadge role={u.role} />
+                <RoleBadge role={u.role} />
               </div>
               <div style={{ fontSize: 13, color: t.textMuted, display: "flex", gap: 16, flexWrap: "wrap" }}>
                 <span>📞 {u.phone}</span>
@@ -188,7 +187,7 @@ function PendingTab({ onAction }) {
   );
 }
 
-// ── All Users ──────────────────────────────────────────────────
+// ── All Users Tab ──────────────────────────────────────────────
 function UsersTab() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -221,8 +220,8 @@ function UsersTab() {
       type: "rejected",
       title: suspended ? "Account suspended ⛔" : "Account reinstated ✅",
       message: suspended
-        ? "Your AvoConnect account has been suspended by admin. Contact support to appeal."
-        : "Your AvoConnect account has been reinstated. You can now trade normally.",
+        ? "Your AvoConnect account has been suspended by admin."
+        : "Your AvoConnect account has been reinstated.",
     });
     setActing(null);
   }
@@ -264,7 +263,6 @@ function UsersTab() {
 
   return (
     <div>
-      {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
@@ -300,7 +298,7 @@ function UsersTab() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>{u.name}</span>
-                 <RoleBadge role={u.role} />
+                  <RoleBadge role={u.role} />
                   {verificationBadge(u)}
                   {u.strikes > 0 && <Badge label={`⚠️ ${u.strikes} strike${u.strikes > 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />}
                 </div>
@@ -325,28 +323,22 @@ function UsersTab() {
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {/* Suspend / Reinstate */}
                   <button onClick={() => toggleSuspend(u)} disabled={acting === u.id}
                     style={{ ...btn(u.suspended ? t.green : "none", u.suspended ? t.white : t.red, u.suspended ? "none" : `1px solid #FCA5A5`), opacity: acting === u.id ? 0.6 : 1 }}>
                     {u.suspended ? "✓ Reinstate" : "⛔ Suspend"}
                   </button>
-                  {/* Clear strikes */}
                   {u.strikes > 0 && (
-                    <button onClick={() => clearStrikes(u.id)}
-                      style={btn("none", t.amber, `1px solid #FCD34D`)}>
+                    <button onClick={() => clearStrikes(u.id)} style={btn("none", t.amber, `1px solid #FCD34D`)}>
                       Clear strikes
                     </button>
                   )}
-                  {/* Re-verify */}
                   {!u.verified && (
-                    <button onClick={() => changeVerification(u, "approved")} disabled={acting === u.id}
-                      style={{ ...btn(t.green, t.white), opacity: acting === u.id ? 0.6 : 1 }}>
+                    <button onClick={() => changeVerification(u, "approved")} disabled={acting === u.id} style={{ ...btn(t.green, t.white), opacity: acting === u.id ? 0.6 : 1 }}>
                       ✓ Verify now
                     </button>
                   )}
                   {u.verified && (
-                    <button onClick={() => changeVerification(u, "pending")} disabled={acting === u.id}
-                      style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), opacity: acting === u.id ? 0.6 : 1 }}>
+                    <button onClick={() => changeVerification(u, "pending")} disabled={acting === u.id} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), opacity: acting === u.id ? 0.6 : 1 }}>
                       Revoke verification
                     </button>
                   )}
@@ -397,7 +389,7 @@ function NoShowsTab() {
                 <span style={{ fontWeight: 600, fontSize: 15 }}>{ns.buyer?.name}</span>
                 {ns.buyer?.suspended
                   ? <Badge label="⛔ Suspended" bg={t.redLight} color={t.red} />
-                  : <Badge label={`⚠️ ${ns.buyer?.strikes} strike${ns.buyer?.strikes > 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />
+                  : <Badge label={`⚠️ ${ns.buyer?.strikes || 0} strike${ns.buyer?.strikes !== 1 ? "s" : ""}`} bg={t.amberLight} color={t.amber} />
                 }
               </div>
               <div style={{ fontSize: 12, color: t.textMuted }}>
@@ -416,181 +408,6 @@ function NoShowsTab() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ── Stats Tab ──────────────────────────────────────────────────
-function StatsTab() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [drill, setDrill] = useState(null); // { title, data, columns }
-  const [drillLoading, setDrillLoading] = useState(false);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    const [
-      { count: totalUsers },
-      { count: farmers },
-      { count: buyers },
-      { count: cooperatives },
-      { count: companies },
-      { count: verified },
-      { count: suspended },
-      { count: pending },
-      { count: totalOrders },
-      { count: completedOrders },
-      { count: noShows },
-      { count: totalListings },
-      { count: reviews },
-    ] = await Promise.all([
-      supabase.from("profiles").select("*", { count: "exact", head: true }),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "farmer"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "buyer"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "cooperative"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "company"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("verified", true),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("suspended", true),
-      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("verification_status", "pending"),
-      supabase.from("orders").select("*", { count: "exact", head: true }),
-      supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "completed"),
-      supabase.from("no_shows").select("*", { count: "exact", head: true }),
-      supabase.from("listings").select("*", { count: "exact", head: true }).eq("is_active", true),
-      supabase.from("reviews").select("*", { count: "exact", head: true }),
-    ]);
-
-    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews });
-    setLoading(false);
-  }
-
-  async function drillDown(title, query) {
-    setDrillLoading(true);
-    setDrill({ title, data: [], loading: true });
-    const { data } = await query;
-    setDrill({ title, data: data || [] });
-    setDrillLoading(false);
-  }
-
-  const DRILLS = {
-    farmers:      () => drillDown("Farmers", supabase.from("profiles").select("name, phone, county, verified, created_at").eq("role", "farmer").order("created_at", { ascending: false })),
-    buyers:       () => drillDown("Buyers", supabase.from("profiles").select("name, phone, county, verified, created_at").eq("role", "buyer").order("created_at", { ascending: false })),
-    cooperatives: () => drillDown("Cooperatives", supabase.from("profiles").select("name, phone, county, verified, created_at").eq("role", "cooperative").order("created_at", { ascending: false })),
-    companies:    () => drillDown("Companies", supabase.from("profiles").select("name, phone, county, verified, created_at").eq("role", "company").order("created_at", { ascending: false })),
-    verified:     () => drillDown("Verified Users", supabase.from("profiles").select("name, phone, county, role, created_at").eq("verified", true).order("created_at", { ascending: false })),
-    suspended:    () => drillDown("Suspended Users", supabase.from("profiles").select("name, phone, county, role, strikes").eq("suspended", true)),
-    pending:      () => drillDown("Pending Verification", supabase.from("profiles").select("name, phone, county, role, created_at").eq("verification_status", "pending").order("created_at", { ascending: true })),
-    orders:       () => drillDown("All Orders", supabase.from("orders").select("*, profiles!orders_buyer_id_fkey(name), listings(variety)").order("created_at", { ascending: false }).limit(50)),
-    completed:    () => drillDown("Completed Orders", supabase.from("orders").select("*, profiles!orders_buyer_id_fkey(name), listings(variety)").eq("status", "completed").order("created_at", { ascending: false })),
-    listings:     () => drillDown("Active Listings", supabase.from("listings").select("*, profiles(name, county)").eq("is_active", true).order("created_at", { ascending: false })),
-    reviews:      () => drillDown("Reviews Written", supabase.from("reviews").select("*, reviewer:profiles!reviews_reviewer_id_fkey(name), reviewee:profiles!reviews_reviewee_id_fkey(name)").order("created_at", { ascending: false })),
-  };
-
-  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
-
-  return (
-    <div>
-      {/* Drill-down modal */}
-      {drill && (
-        <div onClick={() => setDrill(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: t.white, borderRadius: 20, padding: 24, maxWidth: 640, width: "100%", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 20 }}>{drill.title}</h3>
-              <button onClick={() => setDrill(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}>✕</button>
-            </div>
-            {drillLoading ? (
-              <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
-            ) : drill.data.length === 0 ? (
-              <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>No records found.</p>
-            ) : drill.data.map((row, i) => (
-              <div key={i} style={{ background: t.cream, borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: `1px solid ${t.border}`, fontSize: 13 }}>
-                {/* Profile rows */}
-                {row.name && !row.rating && (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.name}</div>
-                      <div style={{ color: t.textMuted }}>📞 {row.phone} · 📍 {row.county} {row.role && `· ${row.role}`}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {row.verified !== undefined && (
-                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: row.verified ? t.greenLight : t.amberLight, color: row.verified ? t.greenDark : "#92400E" }}>
-                          {row.verified ? "✅ Verified" : "⏳ Pending"}
-                        </span>
-                      )}
-                      {row.strikes > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEF3C7", color: "#92400E" }}>⚠️ {row.strikes} strikes</span>}
-                    </div>
-                  </div>
-                )}
-                {/* Order rows */}
-                {row.quantity_kg && (
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.profiles?.name} · {row.listings?.variety}</div>
-                    <div style={{ color: t.textMuted }}>{row.quantity_kg} kg · Ksh {(row.quantity_kg * row.price_per_kg).toLocaleString()} · <span style={{ textTransform: "capitalize" }}>{row.status}</span></div>
-                  </div>
-                )}
-                {/* Listing rows */}
-                {row.variety && !row.quantity_kg && (
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.profiles?.name} · {row.variety}</div>
-                    <div style={{ color: t.textMuted }}>📍 {row.county} · {row.quantity_kg_listing || row.quantity_kg} kg · Ksh {row.price_per_kg}/kg</div>
-                  </div>
-                )}
-                {/* Review rows */}
-                {row.rating && (
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{"⭐".repeat(row.rating)} {row.rating}/5</div>
-                    <div style={{ color: t.textMuted }}>By: {row.reviewer?.name} → {row.reviewee?.name}</div>
-                    {row.comment && <div style={{ color: t.text, marginTop: 4, fontStyle: "italic" }}>"{row.comment}"</div>}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
-        <StatCard icon="👥" label="Total users" value={stats.totalUsers} color={t.blue} />
-        <StatCard icon="🌱" label="Farmers" value={stats.farmers} color={t.green} onClick={DRILLS.farmers} />
-        <StatCard icon="🏪" label="Buyers" value={stats.buyers} color={t.brown} onClick={DRILLS.buyers} />
-        <StatCard icon="🤝" label="Cooperatives" value={stats.cooperatives} color={t.green} onClick={DRILLS.cooperatives} />
-        <StatCard icon="🏢" label="Companies" value={stats.companies} color={t.purple} onClick={DRILLS.companies} />
-        <StatCard icon="✅" label="Verified" value={stats.verified} color={t.green} onClick={DRILLS.verified} />
-        <StatCard icon="⏳" label="Pending review" value={stats.pending} color={t.amber} onClick={DRILLS.pending} />
-        <StatCard icon="⛔" label="Suspended" value={stats.suspended} color={t.red} onClick={DRILLS.suspended} />
-        <StatCard icon="📦" label="Total orders" value={stats.totalOrders} color={t.blue} onClick={DRILLS.orders} />
-        <StatCard icon="🎉" label="Completed" value={stats.completedOrders} color={t.green} onClick={DRILLS.completed} />
-        <StatCard icon="⚠️" label="No-shows" value={stats.noShows} color={t.amber} />
-        <StatCard icon="🥑" label="Active listings" value={stats.totalListings} color={t.green} onClick={DRILLS.listings} />
-        <StatCard icon="⭐" label="Reviews written" value={stats.reviews} color={t.purple} onClick={DRILLS.reviews} />
-      </div>
-
-      {/* Platform health */}
-      {stats.totalOrders > 0 && (
-        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Platform health</div>
-          {[
-            ["Order completion rate", stats.completedOrders, stats.totalOrders, t.green],
-            ["Verification rate", stats.verified, stats.totalUsers, t.blue],
-            ["No-show rate", stats.noShows, stats.totalOrders, t.red],
-          ].map(([label, num, den, color]) => {
-            const pct = den > 0 ? Math.round((num / den) * 100) : 0;
-            return (
-              <div key={label} style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                  <span>{label}</span>
-                  <span style={{ fontWeight: 600, color }}>{pct}%</span>
-                </div>
-                <div style={{ height: 8, background: "#f0f0f0", borderRadius: 99, overflow: "hidden" }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99, transition: "width 0.5s ease" }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -628,8 +445,8 @@ function ResourcesTab() {
       type: status === "approved" ? "accepted" : "rejected",
       title: status === "approved" ? "Resource approved ✅" : "Resource rejected ❌",
       message: status === "approved"
-        ? `Your resource "${resource.title}" has been approved and is now live on AvoConnect.`
-        : `Your resource "${resource.title}" was not approved. ${notes[resource.id] ? "Reason: " + notes[resource.id] : "Please review and resubmit."}`,
+        ? `Your resource "${resource.title}" has been approved.`
+        : `Your resource "${resource.title}" was not approved. ${notes[resource.id] ? "Reason: " + notes[resource.id] : ""}`,
     });
  
     setResources(p => p.filter(r => r.id !== resource.id));
@@ -702,7 +519,178 @@ function ResourcesTab() {
     </div>
   );
 }
- 
+
+// ── Stats Tab ──────────────────────────────────────────────────
+function StatsTab() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState(null); 
+  const [drillLoading, setDrillLoading] = useState(false);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const [
+      { count: totalUsers },
+      { count: farmers },
+      { count: buyers },
+      { count: cooperatives },
+      { count: companies },
+      { count: verified },
+      { count: suspended },
+      { count: pending },
+      { count: totalOrders },
+      { count: completedOrders },
+      { count: noShows },
+      { count: totalListings },
+      { count: reviews },
+    ] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "farmer"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "buyer"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "cooperative"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "company"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("verified", true),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("suspended", true),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("verification_status", "pending"),
+      supabase.from("orders").select("id", { count: "exact", head: true }),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from("no_shows").select("id", { count: "exact", head: true }),
+      supabase.from("listings").select("id", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("reviews").select("id", { count: "exact", head: true }),
+    ]);
+
+    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews });
+    setLoading(false);
+  }
+
+  async function drillDown(title, query) {
+    setDrillLoading(true);
+    setDrill({ title, data: [] });
+    const { data } = await query;
+    setDrill({ title, data: data || [] });
+    setDrillLoading(false);
+  }
+
+  const DRILLS = {
+    farmers:      () => drillDown("Farmers", supabase.from("profiles").select("id, name, phone, county, verified, created_at").eq("role", "farmer").order("created_at", { ascending: false })),
+    buyers:       () => drillDown("Buyers", supabase.from("profiles").select("id, name, phone, county, verified, created_at").eq("role", "buyer").order("created_at", { ascending: false })),
+    cooperatives: () => drillDown("Cooperatives", supabase.from("profiles").select("id, name, phone, county, verified, created_at").eq("role", "cooperative").order("created_at", { ascending: false })),
+    companies:    () => drillDown("Companies", supabase.from("profiles").select("id, name, phone, county, verified, created_at").eq("role", "company").order("created_at", { ascending: false })),
+    verified:     () => drillDown("Verified Users", supabase.from("profiles").select("id, name, phone, county, role, created_at").eq("verified", true).order("created_at", { ascending: false })),
+    suspended:    () => drillDown("Suspended Users", supabase.from("profiles").select("id, name, phone, county, role, strikes").eq("suspended", true)),
+    pending:      () => drillDown("Pending Verification", supabase.from("profiles").select("id, name, phone, county, role, created_at").eq("verification_status", "pending").order("created_at", { ascending: true })),
+    orders:       () => drillDown("All Orders", supabase.from("orders").select("id, quantity_kg, price_per_kg, status, created_at, profiles!orders_buyer_id_fkey(name), listings(variety)").order("created_at", { ascending: false }).limit(50)),
+    completed:    () => drillDown("Completed Orders", supabase.from("orders").select("id, quantity_kg, price_per_kg, status, created_at, profiles!orders_buyer_id_fkey(name), listings(variety)").eq("status", "completed").order("created_at", { ascending: false })),
+    listings:     () => drillDown("Active Listings", supabase.from("listings").select("id, variety, county, price_per_kg, quantity_kg, profiles(name)").eq("is_active", true).order("created_at", { ascending: false })),
+    reviews:      () => drillDown("Reviews Written", supabase.from("reviews").select("id, rating, comment, reviewer:profiles!reviews_reviewer_id_fkey(name), reviewee:profiles!reviews_reviewee_id_fkey(name)").order("created_at", { ascending: false })),
+  };
+
+  if (loading || !stats) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  return (
+    <div>
+      {/* Drill-down modal */}
+      {drill && (
+        <div onClick={() => setDrill(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: t.white, borderRadius: 20, padding: 24, maxWidth: 640, width: "100%", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 20 }}>{drill.title}</h3>
+              <button onClick={() => setDrill(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}>✕</button>
+            </div>
+            {drillLoading ? (
+              <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+            ) : drill.data.length === 0 ? (
+              <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>No records found.</p>
+            ) : drill.data.map((row, i) => (
+              <div key={row.id || i} style={{ background: t.cream, borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: `1px solid ${t.border}`, fontSize: 13 }}>
+                {row.name && !row.rating && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.name}</div>
+                      <div style={{ color: t.textMuted }}>📞 {row.phone} · 📍 {row.county} {row.role && `· ${row.role}`}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {row.verified !== undefined && (
+                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: row.verified ? t.greenLight : t.amberLight, color: row.verified ? t.greenDark : "#92400E" }}>
+                          {row.verified ? "✅ Verified" : "⏳ Pending"}
+                        </span>
+                      )}
+                      {row.strikes > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEF3C7", color: "#92400E" }}>⚠️ {row.strikes} strikes</span>}
+                    </div>
+                  </div>
+                )}
+                {row.quantity_kg && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.profiles?.name} · {row.listings?.variety}</div>
+                    <div style={{ color: t.textMuted }}>{row.quantity_kg} kg · Ksh {(row.quantity_kg * row.price_per_kg).toLocaleString()} · <span style={{ textTransform: "capitalize" }}>{row.status}</span></div>
+                  </div>
+                )}
+                {row.variety && !row.quantity_kg && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.profiles?.name} · {row.variety}</div>
+                    <div style={{ color: t.textMuted }}>📍 {row.county} · {row.quantity_kg_listing || row.quantity_kg || 0} kg · Ksh {row.price_per_kg}/kg</div>
+                  </div>
+                )}
+                {row.rating && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{"⭐".repeat(row.rating)} {row.rating}/5</div>
+                    <div style={{ color: t.textMuted }}>By: {row.reviewer?.name} → {row.reviewee?.name}</div>
+                    {row.comment && <div style={{ color: t.text, marginTop: 4, fontStyle: "italic" }}>"{row.comment}"</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 12, marginBottom: 24 }}>
+        <StatCard icon="👥" label="Total users" value={stats.totalUsers} color={t.blue} />
+        <StatCard icon="🌱" label="Farmers" value={stats.farmers} color={t.green} onClick={DRILLS.farmers} />
+        <StatCard icon="🏪" label="Buyers" value={stats.buyers} color={t.brown} onClick={DRILLS.buyers} />
+        <StatCard icon="🤝" label="Cooperatives" value={stats.cooperatives} color={t.green} onClick={DRILLS.cooperatives} />
+        <StatCard icon="🏢" label="Companies" value={stats.companies} color={t.purple} onClick={DRILLS.companies} />
+        <StatCard icon="✅" label="Verified" value={stats.verified} color={t.green} onClick={DRILLS.verified} />
+        <StatCard icon="⏳" label="Pending review" value={stats.pending} color={t.amber} onClick={DRILLS.pending} />
+        <StatCard icon="⛔" label="Suspended" value={stats.suspended} color={t.red} onClick={DRILLS.suspended} />
+        <StatCard icon="📦" label="Total orders" value={stats.totalOrders} color={t.blue} onClick={DRILLS.orders} />
+        <StatCard icon="🎉" label="Completed" value={stats.completedOrders} color={t.green} onClick={DRILLS.completed} />
+        <StatCard icon="⚠️" label="No-shows" value={stats.noShows} color={t.amber} />
+        <StatCard icon="🥑" label="Active listings" value={stats.totalListings} color={t.green} onClick={DRILLS.listings} />
+        <StatCard icon="⭐" label="Reviews written" value={stats.reviews} color={t.purple} onClick={DRILLS.reviews} />
+      </div>
+
+      {/* Platform health */}
+      {stats.totalOrders > 0 && (
+        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Platform health</div>
+          {[
+            ["Order completion rate", stats.completedOrders, stats.totalOrders, t.green],
+            ["Verification rate", stats.verified, stats.totalUsers, t.blue],
+            ["No-show rate", stats.noShows, stats.totalOrders, t.red],
+          ].map(([label, num, den, color]) => {
+            const pct = den > 0 ? Math.round((num / den) * 100) : 0;
+            return (
+              <div key={label} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span>{label}</span>
+                  <span style={{ fontWeight: 600, color }}>{pct}%</span>
+                </div>
+                <div style={{ height: 8, background: "#f0f0f0", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main AdminPage ─────────────────────────────────────────────
 export default function AdminPage({ profile }) {
   const [tab, setTab] = useState("pending");
@@ -713,7 +701,7 @@ export default function AdminPage({ profile }) {
   async function loadPendingCount() {
     const { count } = await supabase
       .from("profiles")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("verification_status", "pending");
     setPendingCount(count || 0);
   }
