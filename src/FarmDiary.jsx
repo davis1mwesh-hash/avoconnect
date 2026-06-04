@@ -15,12 +15,21 @@ const theme = {
 };
 
 const ACTIVITY_TYPES = [
-  { value: "spraying", label: "🧴 Spraying", color: "#FEF3C7", textColor: "#92400E" },
-  { value: "fertilizer", label: "🌱 Fertilizer", color: "#D1FAE5", textColor: "#065F46" },
-  { value: "irrigation", label: "💧 Irrigation", color: "#DBEAFE", textColor: "#1E40AF" },
-  { value: "harvest", label: "🥑 Harvest", color: "#E1F5EE", textColor: "#0F6E56" },
-  { value: "maturity", label: "📏 Maturity Check", color: "#EDE9FE", textColor: "#5B21B6" },
-  { value: "other", label: "📝 Other", color: "#F3F4F6", textColor: "#374151" },
+  { value: "spraying", label: "🧴 Spraying / Treatment", color: "#FEF3C7", textColor: "#92400E" },
+  { value: "fertilizer", label: "🌱 Nutrition & Fertilizer", color: "#D1FAE5", textColor: "#065F46" },
+  { value: "irrigation", label: "💧 Irrigation Log", color: "#DBEAFE", textColor: "#1E40AF" },
+  { value: "harvest", label: "🥑 Commercial Harvest", color: "#E1F5EE", textColor: "#0F6E56" },
+  { value: "maturity", label: "📏 Dry Matter / Maturity", color: "#EDE9FE", textColor: "#5B21B6" },
+  { value: "other", label: "📝 General Upkeep", color: "#F3F4F6", textColor: "#374151" },
+];
+
+const GROWTH_STAGES = [
+  { value: "dormant", label: "💤 Bud Dormancy / Post-Harvest vegetative growth" },
+  { value: "flowering", label: "🌼 Bud Burst & Flowering" },
+  { value: "fruit_set", label: "🟢 Fruit Set (Pinhead / Shot-berry size)" },
+  { value: "fruit_development", label: "🥑 Fruit Expansion & Development" },
+  { value: "maturity_check", label: "📏 Oil Accumulation & Maturity Testing" },
+  { value: "harvest", label: "🧺 Gathering / Commercial Harvest" }
 ];
 
 const VARIETIES = ["Hass", "Fuerte", "Jumbo", "Pinkerton", "Reed", "Kienyeji"];
@@ -47,6 +56,10 @@ function getActivity(value) {
   return ACTIVITY_TYPES.find(a => a.value === value) || ACTIVITY_TYPES[5];
 }
 
+function getGrowthStageLabel(value) {
+  return GROWTH_STAGES.find(g => g.value === value)?.label || "Not specified";
+}
+
 export default function FarmDiary({ profile, setPage }) {
   const [orchards, setOrchards] = useState([]);
   const [selectedOrchard, setSelectedOrchard] = useState(null);
@@ -65,7 +78,8 @@ export default function FarmDiary({ profile, setPage }) {
 
   const [entryForm, setEntryForm] = useState({
     activity_type: "spraying", date: new Date().toISOString().split("T")[0],
-    notes: "", quantity: "", product_used: "", photo_url: ""
+    notes: "", quantity: "", product_used: "", photo_url: "",
+    growth_stage: "dormant", phi_days: "0", target_pest_disease: ""
   });
 
   const [groupForm, setGroupForm] = useState({
@@ -149,12 +163,17 @@ export default function FarmDiary({ profile, setPage }) {
     if (!selectedOrchard) return;
     const { data, error } = await supabase.from("diary_entries").insert({
       ...entryForm,
+      phi_days: Number(entryForm.phi_days) || 0,
       orchard_id: selectedOrchard.id,
       farmer_id: profile.id,
     }).select().single();
     if (error) { alert(error.message); return; }
     setEntries(prev => [data, ...prev]);
-    setEntryForm({ activity_type: "spraying", date: new Date().toISOString().split("T")[0], notes: "", quantity: "", product_used: "", photo_url: "" });
+    setEntryForm({ 
+      activity_type: "spraying", date: new Date().toISOString().split("T")[0], 
+      notes: "", quantity: "", product_used: "", photo_url: "", 
+      growth_stage: "dormant", phi_days: "0", target_pest_disease: "" 
+    });
     setShowAddEntry(false);
   }
 
@@ -167,66 +186,68 @@ export default function FarmDiary({ profile, setPage }) {
   function downloadReport() {
     if (!selectedOrchard) return;
     const lines = [];
-    lines.push("AVOCONNECT FARM DIARY REPORT");
-    lines.push("=".repeat(50));
-    lines.push(`Farm: ${selectedOrchard.name}`);
-    lines.push(`Farmer: ${profile.name} | Phone: ${profile.phone}`);
-    lines.push(`County: ${profile.county}`);
-    lines.push(`Location: ${selectedOrchard.location || "N/A"}`);
-    lines.push(`Size: ${selectedOrchard.size_acres || "N/A"} acres`);
-    lines.push(`Report Generated: ${new Date().toLocaleDateString()}`);
+    lines.push("AVOCONNECT COMMERCIAL AVOCADO MANAGEMENT REPORT");
+    lines.push("=".repeat(60));
+    lines.push(`Orchard Block: ${selectedOrchard.name}`);
+    lines.push(`Manager/Farmer: ${profile.name} | Contact: ${profile.phone}`);
+    lines.push(`County Jurisdiction: ${profile.county}`);
+    lines.push(`Orchard Location: ${selectedOrchard.location || "N/A"}`);
+    lines.push(`Production Area: ${selectedOrchard.size_acres || "N/A"} acres`);
+    lines.push(`GlobalG.A.P Audit Alignment Date: ${new Date().toLocaleDateString()}`);
     lines.push("");
-    lines.push("TREE CENSUS");
-    lines.push("-".repeat(30));
+    lines.push("ORCHARD CENSUS & STRUCTURE");
+    lines.push("-".repeat(40));
     if (treeGroups.length === 0) {
-      lines.push("No tree groups recorded.");
+      lines.push("No tree blocks structural maps recorded.");
     } else {
       const total = treeGroups.reduce((s, g) => s + g.tree_count, 0);
       treeGroups.forEach(g => {
-        lines.push(`${g.variety} | ${g.age_range} | ${g.tree_count} trees${g.year_planted ? ` | Planted: ${g.year_planted}` : ""}`);
+        lines.push(`${g.variety} | ${g.age_range} | ${g.tree_count} active trees${g.year_planted ? ` | Est: ${g.year_planted}` : ""}`);
       });
-      lines.push(`TOTAL TREES: ${total}`);
+      lines.push(`AGGREGATE TREE INVENTORY: ${total}`);
     }
     lines.push("");
-    lines.push("ACTIVITY LOG");
-    lines.push("-".repeat(30));
+    lines.push("MANAGEMENT LOGS & INPUT COMPLIANCE");
+    lines.push("-".repeat(40));
     if (entries.length === 0) {
-      lines.push("No entries recorded.");
+      lines.push("No dynamic trace inputs recorded.");
     } else {
       entries.forEach(e => {
         const act = getActivity(e.activity_type);
-        lines.push(`\n[${e.date}] ${act.label.replace(/[^\w\s]/g, "").trim()}`);
-        if (e.product_used) lines.push(`  Product: ${e.product_used}`);
-        if (e.quantity) lines.push(`  Quantity: ${e.quantity}`);
-        if (e.notes) lines.push(`  Notes: ${e.notes}`);
+        lines.push(`\n[${e.date}] Phase: ${e.growth_stage ? e.growth_stage.toUpperCase() : 'N/A'} -> ${act.label.replace(/[^\w\s]/g, "").trim()}`);
+        if (e.product_used) lines.push(`  Applied Input: ${e.product_used}`);
+        if (e.quantity) lines.push(`  Dispersal Rate/Qty: ${e.quantity}`);
+        if (e.target_pest_disease) lines.push(`  Target Threat: ${e.target_pest_disease}`);
+        if (e.phi_days) lines.push(`  Pre-Harvest Interval (PHI): ${e.phi_days} Days Clear Quarantine`);
+        if (e.notes) lines.push(`  Field Operations Notes: ${e.notes}`);
       });
     }
     lines.push("");
-    lines.push("=".repeat(50));
-    lines.push("Generated by AvoConnect — Kenya's Avocado Marketplace");
+    lines.push("=".repeat(60));
+    lines.push("Traceability Statement: Verified by AvoConnect Supply Management Platforms.");
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${selectedOrchard.name.replace(/\s/g, "_")}_farm_report.txt`;
+    a.download = `${selectedOrchard.name.replace(/\s/g, "_")}_avocado_management_report.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   const totalTrees = treeGroups.reduce((s, g) => s + g.tree_count, 0);
 
-  if (loading) return <p style={{ textAlign: "center", padding: 40, color: theme.textMuted }}>Loading farm diary…</p>;
+  if (loading) return <p style={{ textAlign: "center", padding: 40, color: theme.textMuted }}>Loading Avocado Management Console…</p>;
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, marginBottom: 4 }}>Farm Diary</h1>
-          <p style={{ fontSize: 14, color: theme.textMuted }}>Track your orchard activities and share with buyers</p>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, marginBottom: 4 }}>Avocado Management</h1>
+          <p style={{ fontSize: 14, color: theme.textMuted }}>Control growth phases, phytosanitary applications, and crop census traceability</p>
         </div>
         <button onClick={() => setShowAddOrchard(true)}
           style={{ padding: "9px 18px", background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>
-          + New orchard
+          + Add Block / Orchard
         </button>
       </div>
 
@@ -235,7 +256,7 @@ export default function FarmDiary({ profile, setPage }) {
           {orchards.map(o => (
             <button key={o.id} onClick={() => setSelectedOrchard(o)}
               style={{ padding: "8px 16px", borderRadius: 99, fontSize: 13, border: `1px solid ${selectedOrchard?.id === o.id ? theme.green : theme.border}`, background: selectedOrchard?.id === o.id ? theme.greenLight : theme.white, color: selectedOrchard?.id === o.id ? theme.greenDark : theme.textMuted, whiteSpace: "nowrap", cursor: "pointer" }}>
-              🌳 {o.name}
+              🌳 Block: {o.name}
             </button>
           ))}
         </div>
@@ -243,12 +264,12 @@ export default function FarmDiary({ profile, setPage }) {
 
       {orchards.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: theme.white, borderRadius: 16, border: `1px solid ${theme.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🌳</div>
-          <h3 style={{ fontSize: 18, marginBottom: 8 }}>No orchards yet</h3>
-          <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 20 }}>Add your first orchard to start logging farm activities.</p>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🥑</div>
+          <h3 style={{ fontSize: 18, marginBottom: 8 }}>No Avocado Blocks Configured</h3>
+          <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 20 }}>Partition your farm into distinct avocado management blocks to begin monitoring phenological operations.</p>
           <button onClick={() => setShowAddOrchard(true)}
             style={{ padding: "10px 24px", background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>
-            Add orchard
+            Add Orchard Block
           </button>
         </div>
       ) : selectedOrchard && (
@@ -256,20 +277,20 @@ export default function FarmDiary({ profile, setPage }) {
           <div style={{ background: theme.white, border: `1px solid ${theme.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
               <div>
-                <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: 2 }}>{selectedOrchard.name}</h2>
-                <p style={{ fontSize: 13, color: theme.textMuted }}>📍 {selectedOrchard.location || profile.county}</p>
+                <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: 2 }}>{selectedOrchard.name} Orchard Data</h2>
+                <p style={{ fontSize: 13, color: theme.textMuted }}>📍 GPS Registry / Location: {selectedOrchard.location || profile.county}</p>
               </div>
               <button onClick={downloadReport}
                 style={{ padding: "7px 14px", border: `1px solid ${theme.green}`, color: theme.green, borderRadius: 8, background: "none", fontSize: 12, cursor: "pointer" }}>
-                ⬇ Download report
+                ⬇ Export Audit Log
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
               {[
-                ["Variety", selectedOrchard.variety],
-                ["Total Trees", totalTrees || selectedOrchard.total_trees || "—"],
-                ["Size", selectedOrchard.size_acres ? `${selectedOrchard.size_acres} ac` : "—"],
-                ["Planted", selectedOrchard.year_planted || "—"],
+                ["Primary Cultivar", selectedOrchard.variety],
+                ["Aggregated Trees", totalTrees || selectedOrchard.total_trees || "—"],
+                ["Total Coverage", selectedOrchard.size_acres ? `${selectedOrchard.size_acres} ac` : "—"],
+                ["Establishment Yr", selectedOrchard.year_planted || "—"],
               ].map(([k, v]) => (
                 <div key={k} style={{ background: theme.cream, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
                   <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>{k}</div>
@@ -284,7 +305,7 @@ export default function FarmDiary({ profile, setPage }) {
             {["diary", "census", "insights"].map(tb => (
               <button key={tb} onClick={() => setTab(tb)}
                 style={{ padding: "10px 20px", fontSize: 14, background: "none", border: "none", borderBottom: `2px solid ${tab === tb ? theme.green : "transparent"}`, color: tab === tb ? theme.green : theme.textMuted, fontWeight: tab === tb ? 500 : 400, cursor: "pointer" }}>
-                {tb === "diary" ? "📓 Activity Log" : tb === "census" ? "🌳 Tree Census" : "✨ Insights"}
+                {tb === "diary" ? "📓 Operations Track" : tb === "census" ? "🌳 Cultivar Census" : "✨ Phenology Analytics"}
               </button>
             ))}
           </div>
@@ -300,29 +321,47 @@ export default function FarmDiary({ profile, setPage }) {
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
                 <button onClick={() => setShowAddEntry(true)}
                   style={{ padding: "8px 18px", background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>
-                  + Log activity
+                  + Log Operations / Treatment
                 </button>
               </div>
               {entries.length === 0 ? (
-                <p style={{ textAlign: "center", color: theme.textMuted, padding: 40 }}>No activities logged yet.</p>
+                <p style={{ textAlign: "center", color: theme.textMuted, padding: 40 }}>No crop actions or treatments traced on this block.</p>
               ) : entries.map(e => {
                 const act = getActivity(e.activity_type);
                 return (
                   <div key={e.id} style={{ background: theme.white, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 16, marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                           <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: act.color, color: act.textColor }}>{act.label}</span>
+                          <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: "#F3E8FF", color: "#6B21A8", fontWeight: 500 }}>
+                            🌱 Phase: {e.growth_stage ? e.growth_stage.replace('_', ' ') : 'Dormant'}
+                          </span>
                           <span style={{ fontSize: 12, color: theme.textMuted }}>{e.date}</span>
                         </div>
-                        {e.product_used && <div style={{ fontSize: 13, marginBottom: 4 }}>🧪 <strong>Product:</strong> {e.product_used}</div>}
-                        {e.quantity && <div style={{ fontSize: 13, marginBottom: 4 }}>⚖️ <strong>Quantity:</strong> {e.quantity}</div>}
-                        {e.notes && <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 8 }}>{e.notes}</div>}
-                        {e.photo_url && <img src={e.photo_url} alt="Farm" style={{ width: "100%", maxWidth: 300, borderRadius: 8, marginTop: 8 }} />}
+                        
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", margin: "8px 0" }}>
+                          {e.product_used && <div style={{ fontSize: 13 }}>🧪 <strong>Input/Compound:</strong> {e.product_used}</div>}
+                          {e.quantity && <div style={{ fontSize: 13 }}>⚖️ <strong>Application Rate:</strong> {e.quantity}</div>}
+                          {e.target_pest_disease && <div style={{ fontSize: 13 }}>🪱 <strong>Target Pathology:</strong> {e.target_pest_disease}</div>}
+                          
+                          {e.phi_days > 0 ? (
+                            <div style={{ fontSize: 13, color: "#B45309", fontWeight: "600" }}>
+                              ⚠️ PHI Safety Wait: {e.phi_days} Days Quarantine
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 13, color: "#047857" }}>
+                              ✅ Zero Harvest Withholding Time
+                            </div>
+                          )}
+                        </div>
+
+                        {e.notes && <div style={{ fontSize: 13, color: theme.textMuted, margin: "8px 0", background: theme.cream, padding: 10, borderRadius: 8 }}>{e.notes}</div>}
+                        {e.photo_url && <img src={e.photo_url} alt="Crop state" style={{ width: "100%", maxWidth: 300, borderRadius: 8, marginTop: 8 }} />}
                       </div>
                       <button onClick={() => deleteEntry(e.id)}
                         style={{ fontSize: 12, padding: "4px 10px", border: "1px solid #FCA5A5", borderRadius: 8, background: "none", color: "#EF4444", marginLeft: 12, cursor: "pointer" }}>
-                        Delete
+                        Remove
                       </button>
                     </div>
                   </div>
@@ -335,20 +374,20 @@ export default function FarmDiary({ profile, setPage }) {
           {tab === "census" && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ fontSize: 17, fontWeight: 500 }}>🌳 Tree Census — {selectedOrchard.name}</h3>
+                <h3 style={{ fontSize: 17, fontWeight: 500 }}>🌳 Tree Census Mapping — {selectedOrchard.name}</h3>
                 <button onClick={() => setShowAddGroup(true)}
                   style={{ padding: "7px 16px", background: theme.green, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
-                  + Add group
+                  + Map Sub-Block
                 </button>
               </div>
 
               {treeGroups.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40, background: theme.white, borderRadius: 14, border: `1px solid ${theme.border}` }}>
                   <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
-                  <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 16 }}>No tree groups yet. Add groups to build your census.</p>
+                  <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 16 }}>No detailed crop groupings listed. Allocate tree lots to build your tracing profile.</p>
                   <button onClick={() => setShowAddGroup(true)}
                     style={{ padding: "9px 20px", background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>
-                    Add first group
+                    Map First Cultivar Group
                   </button>
                 </div>
               ) : (
@@ -356,9 +395,9 @@ export default function FarmDiary({ profile, setPage }) {
                   {/* Summary */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
                     {[
-                      ["Total Trees", totalTrees.toLocaleString()],
-                      ["Varieties", [...new Set(treeGroups.map(g => g.variety))].join(", ")],
-                      ["Age Groups", treeGroups.length],
+                      ["Total Certified Trees", totalTrees.toLocaleString()],
+                      ["Active Varietal Stocks", [...new Set(treeGroups.map(g => g.variety))].join(", ")],
+                      ["Structural Blocks", treeGroups.length],
                     ].map(([k, v]) => (
                       <div key={k} style={{ background: theme.greenLight, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                         <div style={{ fontSize: 11, color: theme.greenDark, marginBottom: 3 }}>{k}</div>
@@ -379,17 +418,17 @@ export default function FarmDiary({ profile, setPage }) {
                             <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 99, background: colors.bg, color: colors.text }}>{g.age_range}</span>
                           </div>
                           <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 2 }}>
-                            {g.tree_count.toLocaleString()} trees
+                            {g.tree_count.toLocaleString()} Plants
                           </div>
                           {g.year_planted && (
                             <div style={{ fontSize: 12, color: theme.textMuted }}>
-                              Planted: {g.year_planted} · Age: {new Date().getFullYear() - g.year_planted} yrs
+                              Orchard Term: Year {g.year_planted} · Root System Age: {new Date().getFullYear() - g.year_planted} yrs old
                             </div>
                           )}
                         </div>
                         <button onClick={() => deleteTreeGroup(g.id)}
                           style={{ fontSize: 12, padding: "5px 12px", border: "1px solid #FCA5A5", borderRadius: 8, background: "none", color: "#EF4444", cursor: "pointer", flexShrink: 0 }}>
-                          Delete
+                          Discard
                         </button>
                       </div>
                     );
@@ -397,7 +436,7 @@ export default function FarmDiary({ profile, setPage }) {
 
                   <div style={{ background: theme.brownLight, borderRadius: 10, padding: 14, marginTop: 8 }}>
                     <p style={{ fontSize: 13, color: theme.brown, lineHeight: 1.6 }}>
-                      📋 This census is included in your downloadable farm report. Buyers can verify your tree ages and varieties before placing an order.
+                      📋 This varietal census map syncs directly with global export audit sheets. Exporters can match your age maps and canopy distributions prior to picking schedules.
                     </p>
                   </div>
                 </>
@@ -411,8 +450,8 @@ export default function FarmDiary({ profile, setPage }) {
       {showAddOrchard && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
           <div style={{ background: theme.white, borderRadius: 16, padding: 24, width: "100%", maxWidth: 440 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Add new orchard</h3>
-            {[["Orchard name", "name", "text"], ["Location / village", "location", "text"], ["Year planted", "year_planted", "number"]].map(([label, key, type]) => (
+            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Configure Avocado Block</h3>
+            {[["Block name / Identifier", "name", "text"], ["Geographical Location / Registry", "location", "text"], ["Year planted", "year_planted", "number"]].map(([label, key, type]) => (
               <div key={key} style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>{label}</label>
                 <input type={type} value={orchardForm[key]} onChange={e => setOrchardForm({ ...orchardForm, [key]: e.target.value })} placeholder={label}
@@ -421,18 +460,18 @@ export default function FarmDiary({ profile, setPage }) {
             ))}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Total trees</label>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Total tree canopy count</label>
                 <input type="number" value={orchardForm.total_trees} onChange={e => setOrchardForm({ ...orchardForm, total_trees: e.target.value })} placeholder="e.g. 200"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Size (acres)</label>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Block Size (acres)</label>
                 <input type="number" value={orchardForm.size_acres} onChange={e => setOrchardForm({ ...orchardForm, size_acres: e.target.value })} placeholder="e.g. 5"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Main variety</label>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Main Avocado Cultivar</label>
               <select value={orchardForm.variety} onChange={e => setOrchardForm({ ...orchardForm, variety: e.target.value })}
                 style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }}>
                 {VARIETIES.map(v => <option key={v}>{v}</option>)}
@@ -440,7 +479,7 @@ export default function FarmDiary({ profile, setPage }) {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setShowAddOrchard(false)} style={{ flex: 1, padding: 12, border: `1px solid ${theme.border}`, borderRadius: 10, background: "none", fontSize: 14, color: theme.textMuted, cursor: "pointer" }}>Cancel</button>
-              <button onClick={addOrchard} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Save orchard</button>
+              <button onClick={addOrchard} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Save Management Block</button>
             </div>
           </div>
         </div>
@@ -450,16 +489,16 @@ export default function FarmDiary({ profile, setPage }) {
       {showAddGroup && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
           <div style={{ background: theme.white, borderRadius: 16, padding: 24, width: "100%", maxWidth: 440 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Add tree group</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Map Canopy Sub-Group</h3>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Variety</label>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Cultivar Variety</label>
               <select value={groupForm.variety} onChange={e => setGroupForm({ ...groupForm, variety: e.target.value })}
                 style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }}>
                 {VARIETIES.map(v => <option key={v}>{v}</option>)}
               </select>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Age range</label>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Canopy Physiological Phase</label>
               <select value={groupForm.age_range} onChange={e => setGroupForm({ ...groupForm, age_range: e.target.value })}
                 style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }}>
                 {AGE_RANGES.map(r => <option key={r}>{r}</option>)}
@@ -467,19 +506,19 @@ export default function FarmDiary({ profile, setPage }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Number of trees</label>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Tree Stock Count</label>
                 <input type="number" value={groupForm.tree_count} onChange={e => setGroupForm({ ...groupForm, tree_count: e.target.value })} placeholder="e.g. 50"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Year planted</label>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Year Planted</label>
                 <input type="number" value={groupForm.year_planted} onChange={e => setGroupForm({ ...groupForm, year_planted: e.target.value })} placeholder="e.g. 2018"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setShowAddGroup(false)} style={{ flex: 1, padding: 12, border: `1px solid ${theme.border}`, borderRadius: 10, background: "none", fontSize: 14, color: theme.textMuted, cursor: "pointer" }}>Cancel</button>
-              <button onClick={addTreeGroup} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Save group</button>
+              <button onClick={addTreeGroup} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Commit Sub-Group</button>
             </div>
           </div>
         </div>
@@ -489,9 +528,10 @@ export default function FarmDiary({ profile, setPage }) {
       {showAddEntry && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
           <div style={{ background: theme.white, borderRadius: 16, padding: 24, width: "100%", maxWidth: 440, maxHeight: "90vh", overflowY: "auto" }}>
-            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Log farm activity</h3>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Activity type</label>
+            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Log Crop Operations & Safety Inputs</h3>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 6 }}>Action Classification</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 {ACTIVITY_TYPES.map(a => (
                   <button key={a.value} onClick={() => setEntryForm({ ...entryForm, activity_type: a.value })}
@@ -501,42 +541,68 @@ export default function FarmDiary({ profile, setPage }) {
                 ))}
               </div>
             </div>
+
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Date</label>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Phenological Growth Stage</label>
+              <select value={entryForm.growth_stage} onChange={e => setEntryForm({ ...entryForm, growth_stage: e.target.value })}
+                style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }}>
+                {GROWTH_STAGES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Date of Operation</label>
               <input type="date" value={entryForm.date} onChange={e => setEntryForm({ ...entryForm, date: e.target.value })}
                 style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
             </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Product used</label>
-                <input value={entryForm.product_used} onChange={e => setEntryForm({ ...entryForm, product_used: e.target.value })} placeholder="e.g. NPK fertilizer"
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Chemical / Compound Used</label>
+                <input value={entryForm.product_used} onChange={e => setEntryForm({ ...entryForm, product_used: e.target.value })} placeholder="e.g. Copper Fungicide, NPK"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Quantity</label>
-                <input value={entryForm.quantity} onChange={e => setEntryForm({ ...entryForm, quantity: e.target.value })} placeholder="e.g. 50kg"
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Dosage / Quantity Rate</label>
+                <input value={entryForm.quantity} onChange={e => setEntryForm({ ...entryForm, quantity: e.target.value })} placeholder="e.g. 200g per tree"
                   style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
               </div>
             </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Target Pest / Disease</label>
+                <input value={entryForm.target_pest_disease} onChange={e => setEntryForm({ ...entryForm, target_pest_disease: e.target.value })} placeholder="e.g. Thrips, Anthracnose"
+                  style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Pre-Harvest Interval (PHI Days)</label>
+                <input type="number" value={entryForm.phi_days} onChange={e => setEntryForm({ ...entryForm, phi_days: e.target.value })} placeholder="e.g. 14" min="0"
+                  style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
+              </div>
+            </div>
+
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Notes</label>
-              <textarea value={entryForm.notes} onChange={e => setEntryForm({ ...entryForm, notes: e.target.value })} rows={3} placeholder="What did you do? Any observations?"
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Field Observation Notes</label>
+              <textarea value={entryForm.notes} onChange={e => setEntryForm({ ...entryForm, notes: e.target.value })} rows={3} placeholder="Describe conditions, canopy coverage rates or observations..."
                 style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14, resize: "none" }} />
             </div>
+
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Photo (optional)</label>
+              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Canopy/Input Document Photo</label>
               <input type="file" accept="image/*" onChange={async e => {
                 const file = e.target.files[0];
                 if (!file) return;
                 const url = await uploadPhoto(file);
                 if (url) setEntryForm({ ...entryForm, photo_url: url });
               }} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }} />
-              {uploading && <p style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>Uploading photo…</p>}
+              {uploading && <p style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>Uploading audit attachment…</p>}
               {entryForm.photo_url && <img src={entryForm.photo_url} alt="preview" style={{ width: "100%", borderRadius: 8, marginTop: 8 }} />}
             </div>
+
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setShowAddEntry(false)} style={{ flex: 1, padding: 12, border: `1px solid ${theme.border}`, borderRadius: 10, background: "none", fontSize: 14, color: theme.textMuted, cursor: "pointer" }}>Cancel</button>
-              <button onClick={addEntry} disabled={uploading} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, opacity: uploading ? .7 : 1, cursor: "pointer" }}>Save entry</button>
+              <button onClick={addEntry} disabled={uploading} style={{ flex: 2, padding: 12, background: theme.green, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, opacity: uploading ? .7 : 1, cursor: "pointer" }}>Commit Log Entry</button>
             </div>
           </div>
         </div>
