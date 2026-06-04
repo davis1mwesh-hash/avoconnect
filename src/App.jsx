@@ -198,59 +198,192 @@ function NotificationBell({ profile }) {
 
 // ── Nav ──────────────────────────────────────────────────────
 function Nav({ setPage, profile, onSignOut }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function go(page) {
+    setPage(page);
+    setMenuOpen(false);
+  }
+
   return (
-    <nav style={{ background: t.white, borderBottom: `1px solid ${t.border}`, padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 62, position: "sticky", top: 0, zIndex: 100, boxShadow: t.shadow }}>
-      <div onClick={() => setPage("home")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${t.green}, ${t.greenDark})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: 18 }}>🥑</span>
+    <>
+      <nav style={{
+        background: t.white, 
+        borderBottom: `1px solid ${t.border}`,
+        height: 62, 
+        position: "sticky", 
+        top: 0, 
+        zIndex: 100,
+        boxShadow: t.shadow, 
+        display: "flex", 
+        alignItems: "center",
+        justifyContent: "space-between", 
+        padding: "0 20px" 
+      }}>
+        <div style={{ display: "flex", alignItems: "center", minWidth: 100 }}>
+          {profile ? (
+            <button onClick={() => setMenuOpen(true)}
+              style={{ background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontSize: 18, color: t.text, display: "flex", alignItems: "center", gap: 8 }}>
+              ☰
+              {profile && <span style={{ fontSize: 12, color: t.textMuted, fontWeight: 500 }}>{profile.name?.split(" ")[0]}</span>}
+            </button>
+          ) : (
+            <button onClick={() => go("login")}
+              style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 16px" }}>
+              Log in
+            </button>
+          )}
         </div>
-        <div>
-          <span className="serif" style={{ fontSize: 20, color: t.text, letterSpacing: "-.3px" }}>AvoConnect</span>
-          <span style={{ fontSize: 10, color: t.textMuted, display: "block", marginTop: -2, letterSpacing: ".5px" }}>KENYA'S AVOCADO MARKETPLACE</span>
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        {profile ? (
-          <>
-            <div style={{ fontSize: 13, color: t.textMuted, padding: "6px 12px", background: t.brownLight, borderRadius: 8 }}>
-              👋 {profile.name.split(" ")[0]}
+
+        <div onClick={() => go("home")} style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${t.green}, ${t.greenDark})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 18 }}>🥑</span>
             </div>
-            <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
-            {profile.role === "farmer" && (
-              <>
-                <button onClick={() => setPage("dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Dashboard</button>
-                <button onClick={() => setPage("diary")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Farm Diary</button>
-                {profile.verified && !profile.suspended && (
-                  <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
-                )}
-              </>
-            )}
-            {profile.role === "cooperative" && (
-              <>
-                <button onClick={() => setPage("coop-dashboard")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>My Cooperative</button>
-                {profile.verified && !profile.suspended && (
-                  <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>+ List avocados</button>
-                )}
-              </>
-            )}
-            {profile.role === "company" && (
-              <button onClick={() => setPage("company-dashboard")} style={{ ...btn(t.green, t.white), padding: "7px 16px" }}>My Listings</button>
-            )}
+            <span className="serif" style={{ fontSize: 22, color: t.text, letterSpacing: "-.3px" }}>AvoConnect</span>
+          </div>
+          <span style={{ fontSize: 9, color: t.textMuted, letterSpacing: "1px", marginTop: -2 }}>KENYA'S AVOCADO MARKETPLACE</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, minWidth: 100 }}>
+          {profile ? (
             <NotificationBell profile={profile} />
-            {profile.phone === "0710701013" && (
-              <button onClick={() => setPage("admin")} style={{ ...btn("none", t.brown, `1px solid ${t.border}`), padding: "7px 14px" }}>⚙️ Admin</button>
+          ) : (
+            <button onClick={() => go("signup")}
+              style={{ ...btn(t.green, t.white), padding: "7px 18px" }}>
+              Join free
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {menuOpen && (
+        <div onClick={() => setMenuOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 200, transition: "opacity .2s" }} />
+      )}
+
+      <div style={{
+        position: "fixed", top: 0, right: 0, bottom: 0, width: 300,
+        background: t.white, zIndex: 201, boxShadow: "-8px 0 40px rgba(0,0,0,.12)",
+        transform: menuOpen ? "translateX(0)" : "translateX(100%)",
+        transition: "transform .25s cubic-bezier(.4,0,.2,1)",
+        display: "flex", flexDirection: "column", overflowY: "auto",
+      }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            {profile ? (
+              <>
+                <div style={{ fontWeight: 600, fontSize: 16, color: t.text, marginBottom: 2 }}>👋 {profile.name}</div>
+                <div style={{ fontSize: 12, color: t.textMuted, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 500,
+                    background: profile.role === "farmer" ? t.greenLight : profile.role === "cooperative" ? "#FEF3C7" : profile.role === "company" ? "#EDE9FE" : "#DBEAFE",
+                    color: profile.role === "farmer" ? t.greenDark : profile.role === "cooperative" ? "#92400E" : profile.role === "company" ? "#5B21B6" : "#1E40AF",
+                  }}>
+                    {profile.role === "farmer" ? "🌱 Farmer" : profile.role === "cooperative" ? "🤝 Cooperative" : profile.role === "company" ? "🏢 Company" : "🏪 Buyer"}
+                  </span>
+                  <span>{profile.county}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontWeight: 600, fontSize: 16, color: t.text }}>Menu</div>
             )}
-            <button onClick={onSignOut} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Sign out</button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 14px" }}>Resources</button>
-            <button onClick={() => setPage("login")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "7px 16px" }}>Log in</button>
-            <button onClick={() => setPage("signup")} style={{ ...btn(t.green, t.white), padding: "7px 18px" }}>Join free</button>
-          </>
+          </div>
+          <button onClick={() => setMenuOpen(false)}
+            style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: t.textMuted, padding: 4 }}>✕</button>
+        </div>
+
+        <div style={{ flex: 1, padding: "12px 0" }}>
+          <MenuItem icon="🏠" label="Marketplace" onClick={() => go("home")} />
+          <MenuItem icon="🌿" label="Resources" onClick={() => go("resources")} />
+
+          {profile?.role === "farmer" && (
+            <>
+              <SidebarSection label="FARMER" />
+              <MenuItem icon="📊" label="My Dashboard" onClick={() => go("dashboard")} />
+              <MenuItem icon="📓" label="Farm Diary" onClick={() => go("diary")} />
+              {profile.verified && !profile.suspended && (
+                <MenuItem icon="➕" label="List avocados" onClick={() => go("list")} highlight />
+              )}
+            </>
+          )}
+
+          {profile?.role === "cooperative" && (
+            <>
+              <SidebarSection label="COOPERATIVE" />
+              <MenuItem icon="🤝" label="My Cooperative" onClick={() => go("coop-dashboard")} />
+              {profile.verified && !profile.suspended && (
+                <MenuItem icon="➕" label="List avocados" onClick={() => go("list")} highlight />
+              )}
+            </>
+          )}
+
+          {profile?.role === "buyer" && (
+            <>
+              <SidebarSection label="BUYER" />
+              <MenuItem icon="🏪" label="Browse listings" onClick={() => go("home")} />
+            </>
+          )}
+
+          {profile?.role === "company" && (
+            <>
+              <SidebarSection label="COMPANY" />
+              <MenuItem icon="🏢" label="My Listings" onClick={() => go("company-dashboard")} />
+            </>
+          )}
+
+          {profile?.phone === "0710701013" && (
+            <>
+              <SidebarSection label="ADMIN" />
+              <MenuItem icon="⚙️" label="Admin Panel" onClick={() => go("admin")} />
+            </>
+          )}
+
+          {!profile && (
+            <>
+              <SidebarSection label="ACCOUNT" />
+              <MenuItem icon="🔑" label="Log in" onClick={() => go("login")} />
+              <MenuItem icon="✨" label="Join free" onClick={() => go("signup")} highlight />
+            </>
+          )}
+        </div>
+
+        {profile && (
+          <div style={{ padding: "12px 16px", borderTop: `1px solid ${t.border}` }}>
+            <button onClick={() => { onSignOut(); setMenuOpen(false); }}
+              style={{ width: "100%", padding: "11px", background: t.brownLight, color: t.brown, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+              Sign out
+            </button>
+          </div>
         )}
       </div>
-    </nav>
+    </>
+  );
+}
+
+function MenuItem({ icon, label, onClick, highlight }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 12,
+        padding: "12px 20px", background: hover ? (highlight ? t.greenLight : t.brownLight) : highlight ? `${t.greenLight}80` : "none",
+        border: "none", cursor: "pointer", textAlign: "left", fontFamily: "Inter, sans-serif",
+        transition: "background .15s",
+      }}>
+      <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{icon}</span>
+      <span style={{ fontSize: 14, fontWeight: highlight ? 600 : 400, color: highlight ? t.greenDark : t.text }}>{label}</span>
+      {highlight && <span style={{ marginLeft: "auto", fontSize: 12, color: t.green }}>→</span>}
+    </button>
+  );
+}
+
+function SidebarSection({ label }) {
+  return (
+    <div style={{ padding: "10px 20px 4px", fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: "1px" }}>
+      {label}
+    </div>
   );
 }
 
@@ -709,7 +842,6 @@ function Signup({ setPage, setProfile }) {
   async function submit() {
     if (!form.name || !form.phone || !form.county || !form.password) { setError("Please fill all fields."); return; }
     setLoading(true); setError("");
-    // Use real email if provided, otherwise generate from phone
     const authEmail = form.email
       ? form.email.trim().toLowerCase()
       : `u${form.phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
@@ -808,7 +940,6 @@ function Login({ setPage, setProfile }) {
   if (!phone || !password) { setError("Please fill all fields."); return; }
   setLoading(true); setError("");
 
-  // First check if user has a real email stored
   const { data: p } = await supabase
     .from("profiles")
     .select("email")
@@ -994,6 +1125,7 @@ function ListForm({ setPage, profile }) {
     </div>
   );
 }
+
 // ── Reset Password ────────────────────────────────────────────
 function ResetPassword({ setPage }) {
   const [password, setPassword] = useState("");
@@ -1046,17 +1178,17 @@ function ResetPassword({ setPage }) {
     </div>
   );
 }
+
 // ── App ───────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("home");
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    // Detect password reset token in URL
-  const hash = window.location.hash;
-  if (hash.includes("type=recovery")) {
-    setPage("reset-password");
-  }
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery")) {
+      setPage("reset-password");
+    }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
