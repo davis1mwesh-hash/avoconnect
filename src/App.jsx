@@ -122,78 +122,81 @@ function NotificationBell({ profile }) {
   const typeIcon = (type) => ({ order: "📦", accepted: "✅", rejected: "❌", completed: "🎉" }[type] || "🔔");
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
-        style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
-      >
-        🔔
-        {unread > 0 && (
-          <span style={{
-            position: "absolute", top: -4, right: -4,
-            background: "#EF4444", color: "#fff",
-            fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
-            borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "0 4px", border: `2px solid ${t.white}`,
-            animation: "pulse 1.5s ease-in-out 3",
-          }}>
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
+  <div ref={ref} style={{ position: "relative" }}>
+    {/* Visual fix: Injects your custom styles for the pulse and slideDown animations */}
+    <style>{css}</style>
 
-      {open && (
-        <div style={{
-          position: "absolute", top: "calc(100% + 10px)", right: 0,
-          width: 340, background: t.white, border: `1px solid ${t.border}`,
-          borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,0.14)",
-          zIndex: 999, animation: "slideDown .15s ease",
-          maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
+    <button
+      onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
+      style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
+    >
+      🔔
+      {unread > 0 && (
+        <span style={{
+          position: "absolute", top: -4, right: -4,
+          background: "#EF4444", color: "#fff",
+          fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
+          borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "0 4px", border: `2px solid ${t.white}`,
+          animation: "pulse 1.5s ease-in-out 3",
         }}>
-          <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
-            {unread > 0 && (
-              <button onClick={markAllRead} style={{ fontSize: 12, color: t.green, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
-                Mark all read
-              </button>
-            )}
-          </div>
-          <div style={{ overflowY: "auto", flex: 1 }}>
-            {notifications.length === 0 ? (
-              <div style={{ padding: "40px 20px", textAlign: "center" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
-                <p style={{ fontSize: 13, color: t.textMuted }}>No notifications yet</p>
-              </div>
-            ) : notifications.map(n => (
-              <div
-                key={n.id}
-                onClick={() => markOneRead(n.id)}
-                style={{
-                  padding: "14px 18px",
-                  borderBottom: `1px solid ${t.border}`,
-                  background: n.is_read ? t.white : t.greenLight,
-                  cursor: "default",
-                  transition: "background .2s",
-                }}
-              >
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>{n.title}</div>
-                    <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
-                    <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
-                  </div>
-                  {!n.is_read && (
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.green, flexShrink: 0, marginTop: 4 }} />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+          {unread > 9 ? "9+" : unread}
+        </span>
       )}
-    </div>
-  );
+    </button>
+
+    {open && (
+      <div style={{
+        position: "absolute", top: "calc(100% + 10px)", right: 0,
+        width: 340, background: t.white, border: `1px solid ${t.border}`,
+        borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,0.14)",
+        zIndex: 999, animation: "slideDown .15s ease",
+        maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
+      }}>
+        <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
+          {unread > 0 && (
+            <button onClick={markAllRead} style={{ fontSize: 12, color: t.green, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {notifications.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+              <p style={{ fontSize: 13, color: t.textMuted }}>No notifications yet</p>
+            </div>
+          ) : notifications.map(n => (
+            <div
+              key={n.id}
+              onClick={() => markOneRead(n.id)}
+              style={{
+                padding: "14px 18px",
+                borderBottom: `1px solid ${t.border}`,
+                background: n.is_read ? t.white : t.greenLight,
+                cursor: "default",
+                transition: "background .2s",
+              }}
+            >
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>{n.title}</div>
+                  <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
+                </div>
+                {!n.is_read && (
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.green, flexShrink: 0, marginTop: 4 }} />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
 }
 
 // ── Nav ──────────────────────────────────────────────────────
@@ -590,19 +593,24 @@ function ListingDetail({ listing: l, setPage, profile }) {
   );
 }
 
-// ── Farmer Dashboard ─────────────────────────────────────────
-function FarmerDashboard({ setPage, profile }) {
+// ──function FarmerDashboard({ setPage, profile }) {
   const [tab, setTab] = useState("listings");
   const [, forceUpdate] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
     return () => clearInterval(interval);
   }, []);
+
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editListing, setEditListing] = useState(null);
   const [reviewOrder, setReviewOrder] = useState(null);
+
+  // New states for tracking buyer requirements and active popups
+  const [buyerRequirements, setBuyerRequirements] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -610,8 +618,13 @@ function FarmerDashboard({ setPage, profile }) {
     setLoading(true);
     const { data: myListings } = await supabase.from("listings").select("*").eq("farmer_id", profile.id).order("created_at", { ascending: false });
     const { data: myOrders } = await supabase.from("orders").select("*, listings(variety, quantity_kg, price_per_kg), profiles!orders_buyer_id_fkey(name, phone)").eq("farmer_id", profile.id).order("created_at", { ascending: false });
+    
+    // Fetch the target requirements posted by buyers
+    const { data: requirements } = await supabase.from("buyer_requirements").select("*").order("created_at", { ascending: false });
+
     setListings(myListings || []);
     setOrders(myOrders || []);
+    setBuyerRequirements(requirements || []);
     setLoading(false);
   }
 
@@ -674,6 +687,33 @@ function FarmerDashboard({ setPage, profile }) {
     setEditListing(null);
   }
 
+  // Saves the linked match to Supabase and pings the buyer's bell icon
+  async function handleSendOfferToSupabase(requirementId, listingId) {
+    const selectedReq = buyerRequirements.find(r => r.id === requirementId);
+    const selectedList = listings.find(l => l.id === listingId);
+    
+    const { error } = await supabase.from("buyer_offers").insert({
+      requirement_id: requirementId,
+      listing_id: listingId,
+      farmer_id: profile.id,
+      status: 'pending'
+    });
+
+    if (error) {
+      alert("You have already linked a listing to this specific buyer request!");
+      return;
+    }
+
+    await supabase.from("notifications").insert({
+      user_id: selectedReq.buyer_id,
+      type: "pending",
+      title: "New Farm Offer! 🥑",
+      message: `${profile.name} offered ${selectedList.quantity_kg} kg of ${selectedList.variety} to satisfy your purchase requirement for ${selectedReq.company_name}.`
+    });
+
+    alert("Your farm listing has been cleanly linked to the buyer's request!");
+  }
+
   const pendingOrders = orders.filter(o => o.status === "pending").length;
   const totalRevenue = orders.filter(o => o.status === "accepted" || o.status === "completed").reduce((sum, o) => sum + (o.quantity_kg * o.price_per_kg), 0);
 
@@ -709,6 +749,143 @@ function FarmerDashboard({ setPage, profile }) {
       </div>
     </div>
   );
+
+  return (
+    <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
+      {/* Tab Navigation Menu Header */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, borderBottom: `1px solid ${t.border}`, paddingBottom: 12 }}>
+        <button 
+          onClick={() => setTab("listings")} 
+          style={{ background: "none", border: "none", fontSize: 15, fontWeight: tab === "listings" ? 600 : 400, color: tab === "listings" ? t.green : t.textMuted, cursor: "pointer", borderBottom: tab === "listings" ? `2px solid ${t.green}` : "none", paddingBottom: 12 }}
+        >
+          My Listings ({listings.length})
+        </button>
+        <button 
+          onClick={() => setTab("orders")} 
+          style={{ background: "none", border: "none", fontSize: 15, fontWeight: tab === "orders" ? 600 : 400, color: tab === "orders" ? t.green : t.textMuted, cursor: "pointer", borderBottom: tab === "orders" ? `2px solid ${t.green}` : "none", paddingBottom: 12 }}
+        >
+          Incoming Orders {pendingOrders > 0 && `(${pendingOrders})`}
+        </button>
+        <button 
+          onClick={() => setTab("buyer_requests")} 
+          style={{ background: "none", border: "none", fontSize: 15, fontWeight: tab === "buyer_requests" ? 600 : 400, color: tab === "buyer_requests" ? t.green : t.textMuted, cursor: "pointer", borderBottom: tab === "buyer_requests" ? `2px solid ${t.green}` : "none", paddingBottom: 12 }}
+        >
+          💼 Browse Buyer Requirements ({buyerRequirements.length})
+        </button>
+      </div>
+
+      {/* VIEW PANEL 1: Active Farmer Listings */}
+      {tab === "listings" && (
+        <div>
+          {/* Your original listings layout maps here */}
+          <p style={{ fontSize: 13, color: t.textMuted }}>Manage your uploaded avocado harvests.</p>
+        </div>
+      )}
+
+      {/* VIEW PANEL 2: Incoming Orders */}
+      {tab === "orders" && (
+        <div>
+          {/* Your original incoming requests loop maps here */}
+          <p style={{ fontSize: 13, color: t.textMuted }}>Track incoming buy contracts from companies.</p>
+        </div>
+      )}
+
+      {/* VIEW PANEL 3: Active Buyer Requests Board */}
+      {tab === "buyer_requests" && (
+        <div style={{ padding: "12px 0" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: t.text }}>Active Buyer Demands</h2>
+          {buyerRequirements.length === 0 ? (
+            <p style={{ fontSize: 13, color: t.textMuted }}>No companies are currently listing buying targets.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+              {buyerRequirements.map((req) => (
+                <div key={req.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <h3 style={{ fontSize: 16, fontWeight: 600, color: t.text, margin: 0 }}>{req.company_name}</h3>
+                        <span style={{ fontSize: 12, color: t.textMuted }}>📍 {req.preferred_location}</span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: t.green }}>Ksh {req.target_price_per_kg}</span>
+                        <p style={{ fontSize: 11, color: t.textMuted, margin: 0 }}>per kg</p>
+                      </div>
+                    </div>
+                    <hr style={{ border: "none", borderTop: `1px solid ${t.border}`, margin: "12px 0" }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: t.text }}><strong>Variety Needed:</strong> {req.variety}</div>
+                      <div style={{ fontSize: 13, color: t.text }}><strong>Min Volume:</strong> {req.min_quantity_kg.toLocaleString()} kg</div>
+                      {req.specifications && (
+                        <div style={{ fontSize: 12, color: t.textMuted, background: t.greenLight, padding: "8px 12px", borderRadius: 8, marginTop: 4 }}>
+                          📋 {req.specifications}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { setSelectedRequest(req); setIsModalOpen(true); }}
+                    style={{ width: "100%", background: t.green, color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Fulfill this Request
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* POPUP MODAL COMPONENT: Link Selection Box Overlay */}
+      {isModalOpen && selectedRequest && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: t.white, width: "100%", maxWidth: 440, borderRadius: 16, padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: t.text }}>Link Your Listing</h3>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}>×</button>
+            </div>
+            <div style={{ background: t.greenLight, padding: 12, borderRadius: 10, fontSize: 13, color: t.text }}>
+              Matching requirement from <strong>{selectedRequest.company_name}</strong>:<br />
+              🌾 Looking for <strong>{selectedRequest.variety}</strong> (Min requirement: {selectedRequest.min_quantity_kg} kg)
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 8, color: t.text }}>Choose an available harvest lot:</label>
+              {listings.filter(l => l.variety.toLowerCase() === selectedRequest.variety.toLowerCase() && l.is_active).length === 0 ? (
+                <p style={{ fontSize: 13, color: "#EF4444" }}>⚠️ You don't have any active farm listings matching {selectedRequest.variety} right now.</p>
+              ) : (
+                <select 
+                  id="listingSelectDropdown"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.white, color: t.text }}
+                >
+                  <option value="">-- Choose matching listing --</option>
+                  {listings
+                    .filter(l => l.variety.toLowerCase() === selectedRequest.variety.toLowerCase() && l.is_active)
+                    .map(l => (
+                      <option key={l.id} value={l.id}>{l.quantity_kg} kg Lot — (Ksh {l.price_per_kg}/kg)</option>
+                    ))
+                  }
+                </select>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: 11, borderRadius: 10, border: `1px solid ${t.border}`, background: "none", color: t.textMuted }}>Cancel</button>
+              <button 
+                onClick={async () => {
+                  const el = document.getElementById("listingSelectDropdown");
+                  if(!el || !el.value) return;
+                  await handleSendOfferToSupabase(selectedRequest.id, el.value);
+                  setIsModalOpen(false);
+                }} 
+                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: t.green, color: "#fff", fontWeight: 600, cursor: "pointer" }}
+              >
+                Send Offer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 16px" }}>
