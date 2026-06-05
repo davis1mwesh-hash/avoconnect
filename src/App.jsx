@@ -885,7 +885,7 @@ function ListingDetail({ listing: l, setPage, profile }) {
       )}
     </div>
   );
-}
+
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 16px" }}>
