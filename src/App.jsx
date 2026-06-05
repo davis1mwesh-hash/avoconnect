@@ -602,6 +602,9 @@ function ListingDetail({ listing: l, setPage, profile }) {
   }, []);
 
   const [listings, setListings] = useState([]);
+  const [buyerRequirements, setBuyerRequirements] = useState([]);
+const [selectedRequest, setSelectedRequest] = useState(null);
+const [isModalOpen, setIsModalOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editListing, setEditListing] = useState(null);
@@ -790,51 +793,13 @@ function ListingDetail({ listing: l, setPage, profile }) {
         </div>
       )}
 
-      {/* VIEW PANEL 3: Active Buyer Requests Board */}
+{/* VIEW PANEL 3: Active Buyer Requests Board */}
       {tab === "buyer_requests" && (
-        <div style={{ padding: "12px 0" }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: t.text }}>Active Buyer Demands</h2>
-          {buyerRequirements.length === 0 ? (
-            <p style={{ fontSize: 13, color: t.textMuted }}>No companies are currently listing buying targets.</p>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-              {buyerRequirements.map((req) => (
-                <div key={req.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                      <div>
-                        <h3 style={{ fontSize: 16, fontWeight: 600, color: t.text, margin: 0 }}>{req.company_name}</h3>
-                        <span style={{ fontSize: 12, color: t.textMuted }}>📍 {req.preferred_location}</span>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: 18, fontWeight: 700, color: t.green }}>Ksh {req.target_price_per_kg}</span>
-                        <p style={{ fontSize: 11, color: t.textMuted, margin: 0 }}>per kg</p>
-                      </div>
-                    </div>
-                    <hr style={{ border: "none", borderTop: `1px solid ${t.border}`, margin: "12px 0" }} />
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: t.text }}><strong>Variety Needed:</strong> {req.variety}</div>
-                      <div style={{ fontSize: 13, color: t.text }}><strong>Min Volume:</strong> {req.min_quantity_kg.toLocaleString()} kg</div>
-                      {req.specifications && (
-                        <div style={{ fontSize: 12, color: t.textMuted, background: t.greenLight, padding: "8px 12px", borderRadius: 8, marginTop: 4 }}>
-                          📋 {req.specifications}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => { setSelectedRequest(req); setIsModalOpen(true); }}
-                    style={{ width: "100%", background: t.green, color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontWeight: 600, cursor: "pointer" }}
-                  >
-                    Fulfill this Request
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={{ padding: "20px", background: "#F3F4F6", borderRadius: "12px" }}>
+          <h2 style={{ color: "#000" }}>Test: The Tab is Open!</h2>
+          <p style={{ color: "#000" }}>If you can see this message, the tab system is working perfectly.</p>
         </div>
       )}
-
       {/* POPUP MODAL COMPONENT: Link Selection Box Overlay */}
       {isModalOpen && selectedRequest && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
