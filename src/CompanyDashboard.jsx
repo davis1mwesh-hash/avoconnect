@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
+import BuyerSourcingTab from './BuyerSourcingTab';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -22,7 +23,7 @@ const btn = (bg, color, border) => ({ padding: "10px 22px", background: bg, colo
 const TYPE_OPTIONS = [
   { value: "input", label: "🧪 Input / Product", desc: "Fertilizers, pesticides, seeds, tools, irrigation" },
   { value: "guide", label: "📖 Guide / Education", desc: "How-to guides, best practices, educational content" },
-  { value: "link",  label: "🔗 External Link",    desc: "Articles, research papers, websites, videos" },
+  { value: "link",  label: "🔗 External Link",     desc: "Articles, research papers, websites, videos" },
 ];
 
 const CATEGORIES = {
@@ -49,8 +50,8 @@ function ResourceForm({ profile, onSave, onCancel, editing }) {
   const [error, setError] = useState("");
   const fileRef = useRef();
   const pdfRef = useRef();
-const [pdfFile, setPdfFile] = useState(null);
-const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   function pickPhoto(e) {
@@ -61,11 +62,11 @@ const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
   }
 
   function pickPdf(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  setPdfFile(file);
-  setPdfName(file.name);
-}
+    const file = e.target.files[0];
+    if (!file) return;
+    setPdfFile(file);
+    setPdfName(file.name);
+  }
 
   async function save() {
     if (!form.title) { setError("Title is required."); return; }
@@ -85,14 +86,14 @@ const [pdfName, setPdfName] = useState(editing?.pdf_url ? "Existing file" : "");
     }
 
     let pdf_url = form.pdf_url || "";
-if (pdfFile) {
-  const ext = pdfFile.name.split(".").pop();
-  const path = `resources/${profile.id}/docs/${Date.now()}.${ext}`;
-  const { error: pdfErr } = await supabase.storage.from("resources").upload(path, pdfFile, { upsert: true });
-  if (pdfErr) { setError("PDF upload failed: " + pdfErr.message); setSaving(false); return; }
-  const { data: pdfUrlData } = supabase.storage.from("resources").getPublicUrl(path);
-  pdf_url = pdfUrlData.publicUrl;
-}
+    if (pdfFile) {
+      const ext = pdfFile.name.split(".").pop();
+      const path = `resources/${profile.id}/docs/${Date.now()}.${ext}`;
+      const { error: pdfErr } = await supabase.storage.from("resources").upload(path, pdfFile, { upsert: true });
+      if (pdfErr) { setError("PDF upload failed: " + pdfErr.message); setSaving(false); return; }
+      const { data: pdfUrlData } = supabase.storage.from("resources").getPublicUrl(path);
+      pdf_url = pdfUrlData.publicUrl;
+    }
 
     const payload = { ...form, photo_url, pdf_url, company_id: profile.id, status: "pending" };
     let error;
@@ -203,35 +204,35 @@ if (pdfFile) {
         )}
       </div>
 
+      {/* PDF / Book upload */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>
+          PDF / Book (optional)
+        </label>
+        <div onClick={() => pdfRef.current.click()}
+          style={{ border: `2px dashed ${pdfName ? t.green : t.border}`, borderRadius: 12, padding: 16, cursor: "pointer", textAlign: "center", background: t.cream }}>
+          {pdfName ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <span style={{ fontSize: 28 }}>📄</span>
+              <span style={{ fontSize: 13, color: t.greenDark, fontWeight: 500 }}>{pdfName}</span>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 28, marginBottom: 4 }}>📄</div>
+              <div style={{ fontSize: 13, color: t.textMuted }}>Click to upload PDF or book</div>
+              <div style={{ fontSize: 11, color: t.textMuted }}>PDF, max 20MB</div>
+            </div>
+          )}
+        </div>
+        <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.epub" onChange={pickPdf} style={{ display: "none" }} />
+        {pdfName && (
+          <button onClick={() => { setPdfFile(null); setPdfName(""); }}
+            style={{ fontSize: 12, color: t.textMuted, background: "none", border: "none", cursor: "pointer", marginTop: 4 }}>
+            ✕ Remove file
+          </button>
+        )}
+      </div>
 
-{/* PDF / Book upload */}
-<div style={{ marginBottom: 20 }}>
-  <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 5, fontWeight: 500 }}>
-    PDF / Book (optional)
-  </label>
-  <div onClick={() => pdfRef.current.click()}
-    style={{ border: `2px dashed ${pdfName ? t.green : t.border}`, borderRadius: 12, padding: 16, cursor: "pointer", textAlign: "center", background: t.cream }}>
-    {pdfName ? (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-        <span style={{ fontSize: 28 }}>📄</span>
-        <span style={{ fontSize: 13, color: t.greenDark, fontWeight: 500 }}>{pdfName}</span>
-      </div>
-    ) : (
-      <div>
-        <div style={{ fontSize: 28, marginBottom: 4 }}>📄</div>
-        <div style={{ fontSize: 13, color: t.textMuted }}>Click to upload PDF or book</div>
-        <div style={{ fontSize: 11, color: t.textMuted }}>PDF, max 20MB</div>
-      </div>
-    )}
-  </div>
-  <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.epub" onChange={pickPdf} style={{ display: "none" }} />
-  {pdfName && (
-    <button onClick={() => { setPdfFile(null); setPdfName(""); }}
-      style={{ fontSize: 12, color: t.textMuted, background: "none", border: "none", cursor: "pointer", marginTop: 4 }}>
-      ✕ Remove file
-    </button>
-  )}
-</div>
       {/* Admin note preview */}
       <div style={{ background: t.amberLight, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
         <p style={{ fontSize: 12, color: "#92400E", lineHeight: 1.6 }}>
@@ -257,6 +258,9 @@ export default function CompanyDashboard({ profile, setPage }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editResource, setEditResource] = useState(null);
+  
+  // 1. Introduce active navigation tab state
+  const [activeTab, setActiveTab] = useState("resources"); 
 
   useEffect(() => { load(); }, []);
 
@@ -290,6 +294,7 @@ export default function CompanyDashboard({ profile, setPage }) {
     rejected: resources.filter(r => r.status === "rejected").length,
   };
 
+  // Intercept view rendering if a resource is actively being added or edited
   if (showForm || editResource) return (
     <div style={{ maxWidth: 620, margin: "0 auto", padding: "28px 16px" }}>
       <button onClick={() => { setShowForm(false); setEditResource(null); }}
@@ -307,68 +312,118 @@ export default function CompanyDashboard({ profile, setPage }) {
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 16px" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+      
+      {/* 2. Top Header Navigation Layout */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <h1 style={{ fontFamily: "Playfair Display, serif", fontSize: 28, marginBottom: 4 }}>Company Dashboard</h1>
           <p style={{ fontSize: 14, color: t.textMuted }}>{profile.company_name || profile.name} · {profile.county}</p>
         </div>
-        <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 20px" }}>
-          + Submit resource
+        
+        {/* Only show "Submit Resource" button when the resources tab is open */}
+        {activeTab === "resources" && (
+          <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 20px" }}>
+            + Submit resource
+          </button>
+        )}
+      </div>
+
+      {/* 3. Tab Switches Navigation Menu */}
+      <div style={{ display: "flex", gap: 6, borderBottom: `2px solid ${t.border}`, marginBottom: 24, paddingBottom: 2 }}>
+        <button 
+          onClick={() => setActiveTab("resources")}
+          style={{
+            padding: "10px 16px",
+            background: "none",
+            border: "none",
+            borderBottom: activeTab === "resources" ? `3px solid ${t.green}` : "3px solid transparent",
+            color: activeTab === "resources" ? t.greenDark : t.textMuted,
+            fontWeight: activeTab === "resources" ? 600 : 500,
+            fontSize: 14,
+            cursor: "pointer",
+            transition: "all 0.15s"
+          }}
+        >
+          🧪 Agricultural Resources
+        </button>
+        <button 
+          onClick={() => setActiveTab("sourcing")}
+          style={{
+            padding: "10px 16px",
+            background: "none",
+            border: "none",
+            borderBottom: activeTab === "sourcing" ? `3px solid ${t.green}` : "3px solid transparent",
+            color: activeTab === "sourcing" ? t.greenDark : t.textMuted,
+            fontWeight: activeTab === "sourcing" ? 600 : 500,
+            fontSize: 14,
+            cursor: "pointer",
+            transition: "all 0.15s"
+          }}
+        >
+          💼 Buyer Sourcing Tenders
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 28 }}>
-        {[["Total", stats.total, "🌿", t.green], ["Approved", stats.approved, "✅", t.greenDark], ["Pending", stats.pending, "⏳", t.amber], ["Rejected", stats.rejected, "❌", t.red]].map(([label, val, icon, color]) => (
-          <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "16px 18px", boxShadow: t.shadow }}>
-            <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
-            <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, color, marginBottom: 2 }}>{val}</div>
-            <div style={{ fontSize: 12, color: t.textMuted }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Resources list */}
-      {loading ? (
-        <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
-      ) : resources.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
-          <p style={{ color: t.textMuted, marginBottom: 16 }}>No resources yet. Submit your first one.</p>
-          <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>+ Submit resource</button>
-        </div>
-      ) : resources.map(r => {
-        const ss = STATUS_STYLES[r.status] || STATUS_STYLES.pending;
-        return (
-          <div key={r.id} style={{ background: t.white, border: `1px solid ${r.status === "rejected" ? "#FCA5A5" : t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: ss.bg, color: ss.color, fontWeight: 500 }}>{ss.label}</span>
-                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: t.brownLight, color: t.brown, fontWeight: 500 }}>{r.type}</span>
-                  {r.category && <span style={{ fontSize: 11, color: t.textMuted }}>· {r.category}</span>}
-                </div>
-                <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
-                {r.description && <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 4 }}>{r.description.substring(0, 100)}{r.description.length > 100 ? "…" : ""}</p>}
-                {r.admin_note && r.status === "rejected" && (
-                  <div style={{ background: t.redLight, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
-                    <span style={{ fontSize: 12, color: t.red }}>Admin note: {r.admin_note}</span>
-                  </div>
-                )}
+      {/* 4. Tab Content Router View */}
+      {activeTab === "sourcing" ? (
+        /* Render Buyer Tender Feature */
+        <BuyerSourcingTab userProfile={profile} />
+      ) : (
+        /* Render Original Resources Management Workspace */
+        <>
+          {/* Stats Deck */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 28 }}>
+            {[["Total", stats.total, "🌿", t.green], ["Approved", stats.approved, "✅", t.greenDark], ["Pending", stats.pending, "⏳", t.amber], ["Rejected", stats.rejected, "❌", t.red]].map(([label, val, icon, color]) => (
+              <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "16px 18px", boxShadow: t.shadow }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+                <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, color, marginBottom: 2 }}>{val}</div>
+                <div style={{ fontSize: 12, color: t.textMuted }}>{label}</div>
               </div>
-              {r.photo_url && (
-                <img src={r.photo_url} alt={r.title} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 10, marginLeft: 12, flexShrink: 0 }} />
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button onClick={() => setEditResource(r)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 14px", fontSize: 12 }}>Edit</button>
-              <button onClick={() => deleteResource(r.id)} style={{ ...btn("none", t.red, "1px solid #FCA5A5"), padding: "6px 14px", fontSize: 12 }}>Delete</button>
-              <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 14px", fontSize: 12 }}>View page →</button>
-            </div>
+            ))}
           </div>
-        );
-      })}
+
+          {/* Resources List Cards */}
+          {loading ? (
+            <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+          ) : resources.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+              <p style={{ color: t.textMuted, marginBottom: 16 }}>No resources yet. Submit your first one.</p>
+              <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>+ Submit resource</button>
+            </div>
+          ) : resources.map(r => {
+            const ss = STATUS_STYLES[r.status] || STATUS_STYLES.pending;
+            return (
+              <div key={r.id} style={{ background: t.white, border: `1px solid ${r.status === "rejected" ? "#FCA5A5" : t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+                <div style={{ display: "flex", justifycontent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: ss.bg, color: ss.color, fontWeight: 500 }}>{ss.label}</span>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: t.brownLight, color: t.brown, fontWeight: 500 }}>{r.type}</span>
+                      {r.category && <span style={{ fontSize: 11, color: t.textMuted }}>· {r.category}</span>}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
+                    {r.description && <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 4 }}>{r.description.substring(0, 100)}{r.description.length > 100 ? "…" : ""}</p>}
+                    {r.admin_note && r.status === "rejected" && (
+                      <div style={{ background: t.redLight, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
+                        <span style={{ fontSize: 12, color: t.red }}>Admin note: {r.admin_note}</span>
+                      </div>
+                    )}
+                  </div>
+                  {r.photo_url && (
+                    <img src={r.photo_url} alt={r.title} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 10, marginLeft: 12, flexShrink: 0 }} />
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={() => setEditResource(r)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 14px", fontSize: 12 }}>Edit</button>
+                  <button onClick={() => deleteResource(r.id)} style={{ ...btn("none", t.red, "1px solid #FCA5A5"), padding: "6px 14px", fontSize: 12 }}>Delete</button>
+                  <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 14px", fontSize: 12 }}>View page →</button>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }
