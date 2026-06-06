@@ -122,81 +122,80 @@ function NotificationBell({ profile }) {
   const typeIcon = (type) => ({ order: "📦", accepted: "✅", rejected: "❌", completed: "🎉" }[type] || "🔔");
 
   return (
-  <div ref={ref} style={{ position: "relative" }}>
-    {/* Visual fix: Injects your custom styles for the pulse and slideDown animations */}
-    <style>{css}</style>
+    <div ref={ref} style={{ position: "relative" }}>
+      <style>{css}</style>
 
-    <button
-      onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
-      style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
-    >
-      🔔
-      {unread > 0 && (
-        <span style={{
-          position: "absolute", top: -4, right: -4,
-          background: "#EF4444", color: "#fff",
-          fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
-          borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "0 4px", border: `2px solid ${t.white}`,
-          animation: "pulse 1.5s ease-in-out 3",
+      <button
+        onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
+        style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
+      >
+        🔔
+        {unread > 0 && (
+          <span style={{
+            position: "absolute", top: -4, right: -4,
+            background: "#EF4444", color: "#fff",
+            fontSize: 10, fontWeight: 700, minWidth: 18, height: 18,
+            borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 4px", border: `2px solid ${t.white}`,
+            animation: "pulse 1.5s ease-in-out 3",
+          }}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 10px)", right: 0,
+          width: 340, background: t.white, border: `1px solid ${t.border}`,
+          borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,0.14)",
+          zIndex: 999, animation: "slideDown .15s ease",
+          maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
         }}>
-          {unread > 9 ? "9+" : unread}
-        </span>
-      )}
-    </button>
-
-    {open && (
-      <div style={{
-        position: "absolute", top: "calc(100% + 10px)", right: 0,
-        width: 340, background: t.white, border: `1px solid ${t.border}`,
-        borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,0.14)",
-        zIndex: 999, animation: "slideDown .15s ease",
-        maxHeight: 480, overflow: "hidden", display: "flex", flexDirection: "column",
-      }}>
-        <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
-          {unread > 0 && (
-            <button onClick={markAllRead} style={{ fontSize: 12, color: t.green, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
-              Mark all read
-            </button>
-          )}
-        </div>
-        <div style={{ overflowY: "auto", flex: 1 }}>
-          {notifications.length === 0 ? (
-            <div style={{ padding: "40px 20px", textAlign: "center" }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
-              <p style={{ fontSize: 13, color: t.textMuted }}>No notifications yet</p>
-            </div>
-          ) : notifications.map(n => (
-            <div
-              key={n.id}
-              onClick={() => markOneRead(n.id)}
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${t.border}`,
-                background: n.is_read ? t.white : t.greenLight,
-                cursor: "default",
-                transition: "background .2s",
-              }}
-            >
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>{n.title}</div>
-                  <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
-                </div>
-                {!n.is_read && (
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.green, flexShrink: 0, marginTop: 4 }} />
-                )}
+          <div style={{ padding: "14px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>Notifications</span>
+            {unread > 0 && (
+              <button onClick={markAllRead} style={{ fontSize: 12, color: t.green, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+                <p style={{ fontSize: 13, color: t.textMuted }}>No notifications yet</p>
               </div>
-            </div>
-          ))}
+            ) : notifications.map(n => (
+              <div
+                key={n.id}
+                onClick={() => markOneRead(n.id)}
+                style={{
+                  padding: "14px 18px",
+                  borderBottom: `1px solid ${t.border}`,
+                  background: n.is_read ? t.white : t.greenLight,
+                  cursor: "default",
+                  transition: "background .2s",
+                }}
+              >
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{typeIcon(n.type)}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: n.is_read ? 400 : 600, fontSize: 13, marginBottom: 3, color: t.text }}>{n.title}</div>
+                    <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.5 }}>{n.message}</div>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5 }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                  {!n.is_read && (
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.green, flexShrink: 0, marginTop: 4 }} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+    </div>
+  );
 }
 
 // ── Nav ──────────────────────────────────────────────────────
@@ -382,6 +381,7 @@ function MenuItem({ icon, label, onClick, highlight }) {
   );
 }
 
+// ── Home ─────────────────────────────────────────────────────
 function SidebarSection({ label }) {
   return (
     <div style={{ padding: "10px 20px 4px", fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: "1px" }}>
@@ -390,7 +390,6 @@ function SidebarSection({ label }) {
   );
 }
 
-// ── Home ─────────────────────────────────────────────────────
 function Home({ setPage }) {
   const [listings, setListings] = useState([]);
   const [search, setSearch] = useState("");
@@ -593,24 +592,23 @@ function ListingDetail({ listing: l, setPage, profile }) {
   );
 }
 
-// ──function FarmerDashboard({ setPage, profile }) {
+// ── FarmerDashboard ───────────────────────────────────────────
+function FarmerDashboard({ setPage, profile }) {
   const [tab, setTab] = useState("listings");
   const [, forceUpdate] = useState(0);
+
   useEffect(() => {
     const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
   const [listings, setListings] = useState([]);
-  const [buyerRequirements, setBuyerRequirements] = useState([]);
-const [selectedRequest, setSelectedRequest] = useState(null);
-const [isModalOpen, setIsModalOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editListing, setEditListing] = useState(null);
   const [reviewOrder, setReviewOrder] = useState(null);
 
-  // New states for tracking buyer requirements and active popups
+  // Unified Buyer Requirements Tracking State
   const [buyerRequirements, setBuyerRequirements] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -622,7 +620,7 @@ const [isModalOpen, setIsModalOpen] = useState(false);
     const { data: myListings } = await supabase.from("listings").select("*").eq("farmer_id", profile.id).order("created_at", { ascending: false });
     const { data: myOrders } = await supabase.from("orders").select("*, listings(variety, quantity_kg, price_per_kg), profiles!orders_buyer_id_fkey(name, phone)").eq("farmer_id", profile.id).order("created_at", { ascending: false });
     
-    // Fetch the target requirements posted by buyers
+    // Fetch target requirements posted by buyers
     const { data: requirements } = await supabase.from("buyer_requirements").select("*").order("created_at", { ascending: false });
 
     setListings(myListings || []);
@@ -780,26 +778,158 @@ const [isModalOpen, setIsModalOpen] = useState(false);
       {/* VIEW PANEL 1: Active Farmer Listings */}
       {tab === "listings" && (
         <div>
-          {/* Your original listings layout maps here */}
-          <p style={{ fontSize: 13, color: t.textMuted }}>Manage your uploaded avocado harvests.</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+            <div>
+              <h1 className="serif" style={{ fontSize: 30, marginBottom: 4 }}>My Dashboard</h1>
+              <p style={{ fontSize: 14, color: t.textMuted }}>{profile.name} · {profile.county} County</p>
+            </div>
+            <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "10px 20px" }}>+ New listing</button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 28 }}>
+            {[["Listings", listings.length, "total posted", "🌿"], ["New Orders", pendingOrders, "awaiting action", "📦"], ["Revenue", `Ksh ${totalRevenue.toLocaleString()}`, "from accepted orders", "💰"]].map(([label, value, sub, icon]) => (
+              <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
+                <div className="serif" style={{ fontSize: 26, color: t.green, marginBottom: 2 }}>{value}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: t.text, marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 11, color: t.textMuted }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {loading ? <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p> :
+            listings.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
+                <p style={{ color: t.textMuted, marginBottom: 16 }}>No listings yet.</p>
+                <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>Post your first listing</button>
+              </div>
+            ) : listings.map(l => (
+              <div key={l.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 10px", borderRadius: 99, fontWeight: 500 }}>{l.variety}</span>
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? "#D1FAE5" : "#F3F4F6", color: l.is_active ? "#065F46" : t.textMuted }}>{l.is_active ? "● Active" : "● Hidden"}</span>
+                      {l.quantity_kg === 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{l.quantity_kg?.toLocaleString()} kg · Ksh {l.price_per_kg}/kg</div>
+                    <div style={{ fontSize: 12, color: t.textMuted }}>Harvest: {l.harvest_date} · {l.certification}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => toggleActive(l)} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 12px", fontSize: 12 }}>{l.is_active ? "Hide" : "Show"}</button>
+                    <button onClick={() => setEditListing(l)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 12px", fontSize: 12 }}>Edit</button>
+                    <button onClick={() => deleteListing(l.id)} style={{ ...btn("none", "#EF4444", "1px solid #FCA5A5"), padding: "6px 12px", fontSize: 12 }}>Delete</button>
+                  </div>
+                </div>
+              </div>
+            ))
+          }
         </div>
       )}
 
       {/* VIEW PANEL 2: Incoming Orders */}
       {tab === "orders" && (
         <div>
-          {/* Your original incoming requests loop maps here */}
-          <p style={{ fontSize: 13, color: t.textMuted }}>Track incoming buy contracts from companies.</p>
+          {loading ? <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p> :
+            orders.length === 0 ? (
+              <p style={{ textAlign: "center", color: t.textMuted, padding: 48 }}>No orders received yet.</p>
+            ) : orders.map(o => (
+              <div key={o.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{o.profiles?.name}</div>
+                    <div style={{ fontSize: 12, color: t.textMuted }}>📞 {o.profiles?.phone}</div>
+                  </div>
+                  <span style={{ fontSize: 11, padding: "4px 12px", borderRadius: 99, background: STATUS_COLORS[o.status]?.bg, color: STATUS_COLORS[o.status]?.text, fontWeight: 500, textTransform: "capitalize" }}>{o.status}</span>
+                </div>
+                <div style={{ background: t.cream, borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${t.border}` }}>
+                  <div style={{ fontSize: 13, marginBottom: 4 }}><strong>{o.listings?.variety}</strong> · {o.quantity_kg} kg · Ksh {o.price_per_kg}/kg</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: t.greenDark }}>Total: Ksh {(o.quantity_kg * o.price_per_kg).toLocaleString()}</div>
+                  {o.message && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 6, fontStyle: "italic" }}>"{o.message}"</div>}
+                </div>
+                {o.status === "pending" && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => updateOrderStatus(o.id, "rejected")} style={{ ...btn("none", "#EF4444", "1px solid #FCA5A5"), flex: 1, padding: "9px" }}>Decline</button>
+                    <button onClick={() => updateOrderStatus(o.id, "accepted")} style={{ ...btn(t.green, t.white), flex: 2, padding: "9px" }}>Accept order ✓</button>
+                  </div>
+                )}
+                {o.status === "accepted" && o.expires_at && (() => {
+                  const remaining = Math.max(0, new Date(o.expires_at) - Date.now());
+                  const hrs = Math.floor(remaining / 3600000);
+                  const mins = Math.floor((remaining % 3600000) / 60000);
+                  return remaining > 0 ? (
+                    <div style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
+                      ⏱ Buyer has {hrs}h {mins}m to confirm pickup
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#991B1B", background: "#FEE2E2", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
+                      ⛔ Order expired — mark as no-show if buyer didn't arrive
+                    </div>
+                  );
+                })()}
+                {o.status === "accepted" && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => updateOrderStatus(o.id, "no_show")} style={{ ...btn("none", "#F59E0B", "1px solid #FCD34D"), flex: 1, padding: "9px", fontSize: 13 }}>⚠️ No-show</button>
+                    <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), flex: 2, padding: "9px" }}>✓ Mark completed</button>
+                  </div>
+                )}
+                {o.status === "completed" && (
+                  <button onClick={() => setReviewOrder(o)} style={{ ...btn(t.greenLight, t.greenDark, "none"), width: "100%", padding: "9px", fontSize: 13, marginTop: 8 }}>
+                    ⭐ Leave review for buyer
+                  </button>
+                )}
+              </div>
+            ))
+          }
         </div>
       )}
 
-{/* VIEW PANEL 3: Active Buyer Requests Board */}
+      {/* VIEW PANEL 3: Active Buyer Requests Board */}
       {tab === "buyer_requests" && (
-        <div style={{ padding: "20px", background: "#F3F4F6", borderRadius: "12px" }}>
-          <h2 style={{ color: "#000" }}>Test: The Tab is Open!</h2>
-          <p style={{ color: "#000" }}>If you can see this message, the tab system is working perfectly.</p>
+        <div style={{ padding: "12px 0" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: t.text }}>Active Buyer Demands</h2>
+          {buyerRequirements.length === 0 ? (
+            <p style={{ fontSize: 13, color: t.textMuted }}>No companies are currently listing buying targets.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+              {buyerRequirements.map((req) => (
+                <div key={req.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <h3 style={{ fontSize: 16, fontWeight: 600, color: t.text, margin: 0 }}>{req.company_name}</h3>
+                        <span style={{ fontSize: 12, color: t.textMuted }}>📍 {req.preferred_location}</span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: t.green }}>Ksh {req.target_price_per_kg}</span>
+                        <p style={{ fontSize: 11, color: t.textMuted, margin: 0 }}>per kg</p>
+                      </div>
+                    </div>
+                    <hr style={{ border: "none", borderTop: `1px solid ${t.border}`, margin: "12px 0" }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: t.text }}><strong>Variety Needed:</strong> {req.variety}</div>
+                      <div style={{ fontSize: 13, color: t.text }}><strong>Min Volume:</strong> {req.min_quantity_kg ? req.min_quantity_kg.toLocaleString() : 0} kg</div>
+                      {req.specifications && (
+                        <div style={{ fontSize: 12, color: t.textMuted, background: t.greenLight, padding: "8px 12px", borderRadius: 8, marginTop: 4 }}>
+                          📋 {req.specifications}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { setSelectedRequest(req); setIsModalOpen(true); }}
+                    style={{ width: "100%", background: t.green, color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Fulfill this Request
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
       {/* POPUP MODAL COMPONENT: Link Selection Box Overlay */}
       {isModalOpen && selectedRequest && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -848,120 +978,7 @@ const [isModalOpen, setIsModalOpen] = useState(false);
           </div>
         </div>
       )}
-    </div>
-  );
 
-
-  return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
-        <div>
-          <h1 className="serif" style={{ fontSize: 30, marginBottom: 4 }}>My Dashboard</h1>
-          <p style={{ fontSize: 14, color: t.textMuted }}>{profile.name} · {profile.county} County</p>
-        </div>
-        <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "10px 20px" }}>+ New listing</button>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 28 }}>
-        {[["Listings", listings.length, "total posted", "🌿"], ["New Orders", pendingOrders, "awaiting action", "📦"], ["Revenue", `Ksh ${totalRevenue.toLocaleString()}`, "from accepted orders", "💰"]].map(([label, value, sub, icon]) => (
-          <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "18px 20px", boxShadow: t.shadow }}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-            <div className="serif" style={{ fontSize: 26, color: t.green, marginBottom: 2 }}>{value}</div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: t.text, marginBottom: 2 }}>{label}</div>
-            <div style={{ fontSize: 11, color: t.textMuted }}>{sub}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", borderBottom: `1px solid ${t.border}`, marginBottom: 20 }}>
-        {["listings", "orders"].map(tb => (
-          <button key={tb} onClick={() => setTab(tb)}
-            style={{ padding: "11px 22px", fontSize: 14, background: "none", border: "none", borderBottom: `2px solid ${tab === tb ? t.green : "transparent"}`, color: tab === tb ? t.green : t.textMuted, fontWeight: tab === tb ? 600 : 400 }}>
-            {tb === "orders" && pendingOrders > 0 ? `Orders (${pendingOrders} new 🔔)` : tb.charAt(0).toUpperCase() + tb.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {loading ? <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p> :
-        tab === "listings" ? (
-          listings.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
-              <p style={{ color: t.textMuted, marginBottom: 16 }}>No listings yet.</p>
-              <button onClick={() => setPage("list")} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>Post your first listing</button>
-            </div>
-          ) : listings.map(l => (
-            <div key={l.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 10px", borderRadius: 99, fontWeight: 500 }}>{l.variety}</span>
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? "#D1FAE5" : "#F3F4F6", color: l.is_active ? "#065F46" : t.textMuted }}>{l.is_active ? "● Active" : "● Hidden"}</span>
-                    {l.quantity_kg === 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#FEE2E2", color: "#991B1B" }}>● Sold out</span>}
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{l.quantity_kg?.toLocaleString()} kg · Ksh {l.price_per_kg}/kg</div>
-                  <div style={{ fontSize: 12, color: t.textMuted }}>Harvest: {l.harvest_date} · {l.certification}</div>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => toggleActive(l)} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 12px", fontSize: 12 }}>{l.is_active ? "Hide" : "Show"}</button>
-                  <button onClick={() => setEditListing(l)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 12px", fontSize: 12 }}>Edit</button>
-                  <button onClick={() => deleteListing(l.id)} style={{ ...btn("none", "#EF4444", "1px solid #FCA5A5"), padding: "6px 12px", fontSize: 12 }}>Delete</button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          orders.length === 0 ? (
-            <p style={{ textAlign: "center", color: t.textMuted, padding: 48 }}>No orders received yet.</p>
-          ) : orders.map(o => (
-            <div key={o.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{o.profiles?.name}</div>
-                  <div style={{ fontSize: 12, color: t.textMuted }}>📞 {o.profiles?.phone}</div>
-                </div>
-                <span style={{ fontSize: 11, padding: "4px 12px", borderRadius: 99, background: STATUS_COLORS[o.status]?.bg, color: STATUS_COLORS[o.status]?.text, fontWeight: 500, textTransform: "capitalize" }}>{o.status}</span>
-              </div>
-              <div style={{ background: t.cream, borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${t.border}` }}>
-                <div style={{ fontSize: 13, marginBottom: 4 }}><strong>{o.listings?.variety}</strong> · {o.quantity_kg} kg · Ksh {o.price_per_kg}/kg</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: t.greenDark }}>Total: Ksh {(o.quantity_kg * o.price_per_kg).toLocaleString()}</div>
-                {o.message && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 6, fontStyle: "italic" }}>"{o.message}"</div>}
-              </div>
-              {o.status === "pending" && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => updateOrderStatus(o.id, "rejected")} style={{ ...btn("none", "#EF4444", "1px solid #FCA5A5"), flex: 1, padding: "9px" }}>Decline</button>
-                  <button onClick={() => updateOrderStatus(o.id, "accepted")} style={{ ...btn(t.green, t.white), flex: 2, padding: "9px" }}>Accept order ✓</button>
-                </div>
-              )}
-              {o.status === "accepted" && o.expires_at && (() => {
-                const remaining = Math.max(0, new Date(o.expires_at) - Date.now());
-                const hrs = Math.floor(remaining / 3600000);
-                const mins = Math.floor((remaining % 3600000) / 60000);
-                return remaining > 0 ? (
-                  <div style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
-                    ⏱ Buyer has {hrs}h {mins}m to confirm pickup
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: "#991B1B", background: "#FEE2E2", padding: "6px 12px", borderRadius: 8, marginBottom: 8 }}>
-                    ⛔ Order expired — mark as no-show if buyer didn't arrive
-                  </div>
-                );
-              })()}
-              {o.status === "accepted" && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => updateOrderStatus(o.id, "no_show")} style={{ ...btn("none", "#F59E0B", "1px solid #FCD34D"), flex: 1, padding: "9px", fontSize: 13 }}>⚠️ No-show</button>
-                  <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn("#6366F1", t.white), flex: 2, padding: "9px" }}>✓ Mark completed</button>
-                </div>
-              )}
-              {o.status === "completed" && (
-                <button onClick={() => setReviewOrder(o)} style={{ ...btn(t.greenLight, t.greenDark, "none"), width: "100%", padding: "9px", fontSize: 13, marginTop: 8 }}>
-                  ⭐ Leave review for buyer
-                </button>
-              )}
-            </div>
-          ))
-        )
-      }
       {reviewOrder && (
         <ReviewModal
           order={reviewOrder}
@@ -1078,29 +1095,29 @@ function Login({ setPage, setProfile }) {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
- async function login() {
-  if (!phone || !password) { setError("Please fill all fields."); return; }
-  setLoading(true); setError("");
+  async function login() {
+    if (!phone || !password) { setError("Please fill all fields."); return; }
+    setLoading(true); setError("");
 
-  const { data: p } = await supabase
-    .from("profiles")
-    .select("email")
-    .eq("phone", phone.trim())
-    .maybeSingle();
+    const { data: p } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("phone", phone.trim())
+      .maybeSingle();
 
-  const authEmail = p?.email 
-    ? p.email 
-    : `u${phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
+    const authEmail = p?.email 
+      ? p.email 
+      : `u${phone.replace(/\s/g, "").replace(/\+/g, "")}@avoconnect.ke`;
 
-  const { data, error: e } = await supabase.auth.signInWithPassword({ email: authEmail, password });
-  if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
-  setProfile(profile);
-  if (profile.role === "farmer") setPage("dashboard");
-  else if (profile.role === "cooperative") setPage("coop-dashboard");
-  else if (profile.role === "company") setPage("company-dashboard");
-  else setPage("home");
-}
+    const { data, error: e } = await supabase.auth.signInWithPassword({ email: authEmail, password });
+    if (e) { setError("Wrong phone or password. Please try again."); setLoading(false); return; }
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+    setProfile(profile);
+    if (profile.role === "farmer") setPage("dashboard");
+    else if (profile.role === "cooperative") setPage("coop-dashboard");
+    else if (profile.role === "company") setPage("company-dashboard");
+    else setPage("home");
+  }
 
   async function sendReset() {
     if (!resetPhone) { setError("Please enter your phone number."); return; }
