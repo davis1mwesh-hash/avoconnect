@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { publishRequirement, fetchOffersForBuyer } from './buyerService';
+import { publishRequirement, fetchOffersForBuyer } from "./buyerService.jsx";
 
 export default function BuyerSourcingTab({ userProfile }) {
   // Form State

@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import FarmInsights from "./FarmInsights";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from "./App"; // I
 
 const theme = {
   green: "#2D7A4F", greenDark: "#1A5C35", greenLight: "#EAF4EE",

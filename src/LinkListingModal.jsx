@@ -1,102 +1,235 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { supabase } from "./App";
 
-export default function LinkListingModal({ isOpen, onClose, selectedRequest, farmerListings, onSubmitOffer, theme }) {
-  const t = theme;
-  const [selectedListingId, setSelectedListingId] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const t = {
+  green: "#2D7A4F",
+  greenDark: "#1A5C35",
+  greenLight: "#EAF4EE",
+  brown: "#6B4C2A",
+  brownLight: "#F5EFE6",
+  cream: "#FDFAF5",
+  white: "#FFFFFF",
+  text: "#1C1C1A",
+  textMuted: "#6B6B5F",
+  border: "#E2DDD6",
+  shadow: "0 12px 40px rgba(0,0,0,0.14)",
+  red: "#EF4444",
+  redLight: "#FEE2E2"
+};
 
-  // Filter listings where the variety matches the buyer's requirement
-  const matchingListings = farmerListings.filter(
-    (l) => l.variety?.toLowerCase() === selectedRequest?.variety?.toLowerCase()
-  );
+const btn = (bg, color, border) => ({
+  padding: "10px 22px",
+  background: bg,
+  color,
+  border: border || "none",
+  borderRadius: 10,
+  fontSize: 14,
+  fontWeight: 500,
+  cursor: "pointer",
+  fontFamily: "Inter, sans-serif"
+});
 
-  // Auto-select option if the farmer only has exactly one matching avocado lot
+export default function LinkListingModal({ requirement, profile, onClose }) {
+  const [myListings, setMyListings] = useState([]);
+  const [existingOfferIds, setExistingOfferIds] = useState(new Set());
+  const [selectedListingId, setSelectedListingId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
   useEffect(() => {
-    if (matchingListings.length === 1) {
-      setSelectedListingId(matchingListings[0].id);
-    } else {
-      setSelectedListingId('');
+    loadMatchingLots();
+  }, [requirement]);
+
+  async function loadMatchingLots() {
+  try {
+    setLoading(true);
+    setError("");
+
+    const { data: listings, error: listErr } = await supabase
+      .from("listings")
+      .select("*")
+      .eq("farmer_id", profile.id)
+      .eq("variety", requirement.variety)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (listErr) throw listErr;
+    setMyListings(listings || []);
+  } catch (err) {
+    console.error("Error loading lots:", err);
+    setError("Failed to fetch matching farm lots.");
+  } finally {
+    setLoading(false);
+  }
+}
+
+  async function handlePitch(e) {
+    e.preventDefault();
+    if (!selectedListingId) {
+      setError("Please pick a harvest lot configuration to pitch.");
+      return;
     }
-  }, [selectedRequest, farmerListings]);
 
-  if (!isOpen || !selectedRequest) return null;
-
-  const handleSubmit = async () => {
-    if (!selectedListingId) return;
-    setIsSubmitting(true);
     try {
-      await onSubmitOffer(selectedRequest.id, selectedListingId);
+      setSubmitting(true);
+      setError("");
+
+      const chosenListing = myListings.find(l => l.id === selectedListingId);
+
+     const { error: insertErr } = await supabase
+  .from("pitches")
+  .insert({
+    farmer_id: profile.id,
+    buyer_id: requirement.buyer_id,
+    requirement_id: requirement.id,
+    listing_id: chosenListing.id,
+    message: "",
+    status: "pending"
+  });
+
+if (!insertErr) {
+  await supabase.from("notifications").insert({
+    user_id: requirement.buyer_id,
+    type: "pitch",
+    title: "New Harvest Pitch 🥑",
+    message: `${profile.name} pitched ${chosenListing.quantity_kg?.toLocaleString()} kg of ${chosenListing.variety} at Ksh ${chosenListing.price_per_kg}/kg for your ${requirement.variety} requirement.`,
+  });
+}
+
+      if (insertErr) throw insertErr;
+
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (err) {
-      console.error(err);
+      console.error("Error submitting commercial pitch lot:", err);
+      setError(err.message || "Failed to publish offer pitch row.");
     } finally {
-      setIsSubmitting(false);
-      onClose();
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: t.white, width: "100%", maxWidth: 440, borderRadius: 16, padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", gap: 16 }}>
-        
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: t.text }}>Link Your Harvest Listing</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}>×</button>
-        </div>
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
+      zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16
+    }}>
+      <div style={{
+        background: t.white, border: `1px solid ${t.border}`, borderRadius: 20,
+        boxShadow: t.shadow, maxWidth: 480, width: "100%", padding: 24, position: "relative"
+      }}>
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}
+        >
+          ✕
+        </button>
 
-        {/* Selected Buyer Context Box */}
-        <div style={{ background: t.greenLight, padding: 12, borderRadius: 10, fontSize: 13, color: t.text, lineHeight: "1.5" }}>
-          Matching request from <strong>{selectedRequest.company_name}</strong>:<br />
-          🌾 Looking for <strong>{selectedRequest.variety}</strong> (Min: {selectedRequest.min_quantity_kg?.toLocaleString()} kg)
-        </div>
+        <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 22, marginBottom: 6, color: t.text }}>
+          Pitch Supply Lot Match
+        </h3>
+        <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 20 }}>
+          Link your active crop volume lot to this buyer's matching <strong>{requirement.variety}</strong> tender request.
+        </p>
 
-        {/* Dropdown Selection Logic */}
-        <div>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 8, color: t.text }}>Select your matching farm listing:</label>
-          {matchingListings.length === 0 ? (
-            <div style={{ padding: "12px 14px", background: "#FEF2F2", borderRadius: 10, border: "1px solid #FEE2E2" }}>
-              <p style={{ fontSize: 13, color: "#EF4444", margin: 0, fontWeight: 500 }}>⚠️ You don't have any active harvest listings for {selectedRequest.variety} avocados right now.</p>
+        {success ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+            <h4 style={{ fontSize: 16, fontWeight: 600, color: t.greenDark, marginBottom: 4 }}>Pitch Sent Successfully!</h4>
+            <p style={{ fontSize: 13, color: t.textMuted }}>The buyer has been notified of your matching lot.</p>
+          </div>
+        ) : loading ? (
+          <p style={{ textAlign: "center", fontSize: 14, color: t.textMuted, padding: "20px 0" }}>
+            Scanning your active matching lots…
+          </p>
+        ) : (
+          <form onSubmit={handlePitch}>
+            {error && (
+              <p style={{ fontSize: 13, color: t.red, padding: 10, background: t.redLight, borderRadius: 8, marginBottom: 16 }}>
+                {error}
+              </p>
+            )}
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 8, fontWeight: 600 }}>
+                SELECT MATCHING LOT VOLUME
+              </label>
+
+              {myListings.length === 0 ? (
+                <div style={{ padding: 16, background: t.cream, borderRadius: 12, border: `1px solid ${t.border}`, textAlign: "center" }}>
+                  <p style={{ fontSize: 13, color: t.textMuted, margin: "0 0 10px 0" }}>
+                    No active <strong>{requirement.variety}</strong> listings found.
+                  </p>
+                  <p style={{ fontSize: 12, color: t.textMuted, margin: 0 }}>
+                    Please add or activate a matching harvest lot from your dashboard grid configuration first.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 200, overflowY: "auto" }}>
+                  {myListings.map(l => {
+                    const alreadyPitched = existingOfferIds.has(l.id);
+                    return (
+                      <label 
+                        key={l.id} 
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: 12,
+                          background: selectedListingId === l.id ? t.greenLight : t.white,
+                          border: `1.5px solid ${selectedListingId === l.id ? t.green : t.border}`,
+                          borderRadius: 12, cursor: alreadyPitched ? "not-allowed" : "pointer",
+                          opacity: alreadyPitched ? 0.6 : 1
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="listingMatch"
+                          value={l.id}
+                          disabled={alreadyPitched}
+                          checked={selectedListingId === l.id}
+                          onChange={() => setSelectedListingId(l.id)}
+                          style={{ accentColor: t.green }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
+                            📦 {l.quantity_kg?.toLocaleString()} KG Lot
+                          </div>
+                          <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+                            KES {l.price_per_kg}/KG · Harvest: {l.harvest_date} {l.certification !== "None" && `· 🛡️ ${l.certification}`}
+                          </div>
+                        </div>
+                        {alreadyPitched && (
+                          <span style={{ fontSize: 11, background: t.brownLight, color: t.brown, padding: "2px 8px", borderRadius: 6, fontWeight: 500 }}>
+                            Pitched
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : (
-            <select 
-              value={selectedListingId} 
-              onChange={(e) => setSelectedListingId(e.target.value)} 
-              style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.white, color: t.text, fontSize: 14 }}
-            >
-              <option value="">-- Choose an Available Listing --</option>
-              {matchingListings.map((l) => (
-                <option key={l.id} value={l.id}>
-                  🧺 {l.quantity_kg?.toLocaleString()} kg — (Ksh {l.price_per_kg}/kg)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
 
-        {/* Action Controls */}
-        <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 11, borderRadius: 10, border: `1px solid ${t.border}`, background: "none", color: t.textMuted, fontSize: 14, fontWeight: 500 }}>
-            Cancel
-          </button>
-          <button 
-            onClick={handleSubmit} 
-            disabled={!selectedListingId || isSubmitting} 
-            style={{ 
-              flex: 1, 
-              padding: 11, 
-              borderRadius: 10, 
-              border: "none", 
-              background: !selectedListingId || isSubmitting ? t.border : t.green, 
-              color: "#fff", 
-              fontWeight: 600,
-              fontSize: 14,
-              opacity: isSubmitting ? 0.8 : 1
-            }}
-          >
-            {isSubmitting ? "Linking..." : "Send Offer"}
-          </button>
-        </div>
-
+            <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${t.border}`, paddingTop: 16 }}>
+              <button 
+                type="button" 
+                onClick={onClose} 
+                style={{ ...btn("none", t.textMuted, `1.5px solid ${t.border}`), flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !selectedListingId}
+                style={{ ...btn(t.green, t.white), flex: 2, opacity: (submitting || !selectedListingId) ? 0.6 : 1 }}
+              >
+                {submitting ? "Linking Lot..." : "Confirm Pitch Supply"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

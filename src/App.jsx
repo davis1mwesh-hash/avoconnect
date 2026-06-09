@@ -6,9 +6,12 @@ import ReviewModal from "./ReviewModal";
 import Resources from "./Resources";
 import CompanyDashboard from "./CompanyDashboard";
 import CoopDashboard from "./CoopDashboard";
-import LinkListingModal from "./LinkListingModal"; // Added modular offer linker
+import LinkListingModal from "./LinkListingModal"; 
+import FarmerDashboard from "./FarmerDashboard";
+import BuyerDashboard from "./BuyerDashboard";
 
-const supabase = createClient(
+// THIS IS THE ONLY GENERATOR IN THE PROJECT
+export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
@@ -120,12 +123,11 @@ function NotificationBell({ profile }) {
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
-  const typeIcon = (type) => ({ order: "📦", accepted: "✅", rejected: "❌", completed: "🎉" }[type] || "🔔");
+  const typeIcon = (type) => ({ order: "📦", accepted: "✅", rejected: "❌", completed: "🎉", pitch: "🥑" }[type] || "🔔");
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <style>{css}</style>
-
       <button
         onClick={() => { setOpen(o => !o); if (!open && unread > 0) markAllRead(); }}
         style={{ position: "relative", background: "none", border: `1px solid ${t.border}`, borderRadius: 10, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, color: t.textMuted, fontSize: 18 }}
@@ -282,7 +284,7 @@ function Nav({ setPage, profile, onSignOut }) {
                     background: profile.role === "farmer" ? t.greenLight : profile.role === "cooperative" ? "#FEF3C7" : profile.role === "company" ? "#EDE9FE" : "#DBEAFE",
                     color: profile.role === "farmer" ? t.greenDark : profile.role === "cooperative" ? "#92400E" : profile.role === "company" ? "#5B21B6" : "#1E40AF",
                   }}>
-                    {profile.role === "farmer" ? "🌱 Farmer" : profile.role === "cooperative" ? "🤝 Cooperative" : profile.role === "company" ? "🏢 Company" : "🏪 Buyer"}
+                    {profile.role === "farmer" ? "🌱 Farmer" : profile.role === "cooperative" ? "🤝 Cooperative" : profile.role === "company" ? "🧪 Input Supplier" : "🏪 Buyer"}
                   </span>
                   <span>{profile.county}</span>
                 </div>
@@ -322,15 +324,16 @@ function Nav({ setPage, profile, onSignOut }) {
 
           {profile?.role === "buyer" && (
             <>
-              <SidebarSection label="BUYER" />
+              <SidebarSection label="BUYER / EXPORTER" />
               <MenuItem icon="🏪" label="Browse listings" onClick={() => go("home")} />
+              <MenuItem icon="💼" label="Buyer Dashboard Portal" onClick={() => go("buyer-dashboard")} highlight />
             </>
           )}
 
           {profile?.role === "company" && (
             <>
-              <SidebarSection label="COMPANY" />
-              <MenuItem icon="🏢" label="My Listings" onClick={() => go("company-dashboard")} />
+              <SidebarSection label="AGRICULTURAL SUPPLIER" />
+              <MenuItem icon="🧪" label="Supplier Dashboard" onClick={() => go("company-dashboard")} />
             </>
           )}
 
@@ -382,7 +385,6 @@ function MenuItem({ icon, label, onClick, highlight }) {
   );
 }
 
-// ── SidebarSection ───────────────────────────────────────────
 function SidebarSection({ label }) {
   return (
     <div style={{ padding: "10px 20px 4px", fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: "1px" }}>
@@ -594,365 +596,6 @@ function ListingDetail({ listing: l, setPage, profile }) {
   );
 }
 
-// ── FarmerDashboard ───────────────────────────────────────────
-function FarmerDashboard({ setPage, profile }) {
-  const [tab, setTab] = useState("listings");
-  const [, forceUpdate] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => forceUpdate(n => n + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const [listings, setListings] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editListing, setEditListing] = useState(null);
-  const [reviewOrder, setReviewOrder] = useState(null);
-
-  // Unified Buyer Requirements Tracking State
-  const [buyerRequirements, setBuyerRequirements] = useState([]);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => { loadAll(); }, []);
-
-  async function loadAll() {
-    setLoading(true);
-    const { data: myListings } = await supabase.from("listings").select("*").eq("farmer_id", profile.id).order("created_at", { ascending: false });
-    const { data: myOrders } = await supabase.from("orders").select("*, listings(variety, quantity_kg, price_per_kg), profiles!orders_buyer_id_fkey(name, phone)").eq("farmer_id", profile.id).order("created_at", { ascending: false });
-    
-    // Fetch target requirements posted by buyers
-    const { data: requirements } = await supabase.from("buyer_requirements").select("*").order("created_at", { ascending: false });
-
-    setListings(myListings || []);
-    setOrders(myOrders || []);
-    setBuyerRequirements(requirements || []);
-    setLoading(false);
-  }
-
-  async function deleteListing(id) {
-    if (!confirm("Delete this listing?")) return;
-    await supabase.from("listings").delete().eq("id", id);
-    setListings(prev => prev.filter(l => l.id !== id));
-  }
-
-  async function toggleActive(listing) {
-    await supabase.from("listings").update({ is_active: !listing.is_active }).eq("id", listing.id);
-    setListings(prev => prev.map(l => l.id === listing.id ? { ...l, is_active: !l.is_active } : l));
-  }
-
-  async function updateOrderStatus(orderId, status) {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-    await supabase.from("orders").update({ status }).eq("id", orderId);
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-
-    if (status === "accepted") {
-      const listing = listings.find(l => l.id === order.listing_id);
-      if (listing) {
-        const remaining = (listing.quantity_kg || 0) - (order.quantity_kg || 0);
-        const shouldDeactivate = remaining <= 0;
-        const newQty = Math.max(0, remaining);
-        await supabase.from("listings").update({ quantity_kg: newQty, is_active: !shouldDeactivate }).eq("id", listing.id);
-        setListings(prev => prev.map(l => l.id === listing.id ? { ...l, quantity_kg: newQty, is_active: !shouldDeactivate } : l));
-      }
-      const varietyName = order.listings?.variety || "avocados";
-      const totalKsh = (order.quantity_kg * order.price_per_kg).toLocaleString();
-      await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "accepted",
-        title: "Order accepted! ✅",
-        message: `${profile.name} accepted your order for ${order.quantity_kg} kg of ${varietyName} (Ksh ${totalKsh}). They will contact you shortly.`,
-      });
-    }
-
-    if (status === "rejected") {
-      const varietyName = order.listings?.variety || "avocados";
-      await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "rejected",
-        title: "Order declined ❌",
-        message: `${profile.name} was unable to fulfil your order for ${order.quantity_kg} kg of ${varietyName}. You can browse other listings on the marketplace.`,
-      });
-    }
-
-    if (status === "completed") {
-      const varietyName = order.listings?.variety || "avocados";
-      await supabase.from("notifications").insert({
-        user_id: order.buyer_id,
-        type: "completed",
-        title: "Order completed 🎉",
-        message: `Your order of ${order.quantity_kg} kg of ${varietyName} from ${profile.name} has been marked as completed. Thank you for trading on AvoConnect!`,
-      });
-    }
-  }
-
-  async function saveEdit() {
-    await supabase.from("listings").update({
-      variety: editListing.variety,
-      quantity_kg: Number(editListing.quantity_kg),
-      price_per_kg: Number(editListing.price_per_kg),
-      harvest_date: editListing.harvest_date,
-      certification: editListing.certification,
-      description: editListing.description,
-    }).eq("id", editListing.id);
-    setListings(prev => prev.map(l => l.id === editListing.id ? { ...l, ...editListing } : l));
-    setEditListing(null);
-  }
-
-  // Saves the linked match to Supabase and pings the buyer's bell icon
-  async function handleSendOfferToSupabase(requirementId, listingId) {
-    const selectedReq = buyerRequirements.find(r => r.id === requirementId);
-    const selectedList = listings.find(l => l.id === listingId);
-
-    const { error } = await supabase.from("buyer_offers").insert({
-      requirement_id: requirementId,
-      listing_id: listingId,
-      farmer_id: profile.id,
-      status: 'pending'
-    });
-
-    if (error) {
-      alert("You have already linked a listing to this specific buyer request!");
-      return;
-    }
-
-    await supabase.from("notifications").insert({
-      user_id: selectedReq.buyer_id,
-      type: "pending",
-      title: "New Farm Offer! 🥑",
-      message: `${profile.name} offered ${selectedList.quantity_kg} kg of ${selectedList.variety} to satisfy your purchase requirement for ${selectedReq.company_name}.`
-    });
-
-    alert("Your farm listing has been cleanly linked to the buyer's request!");
-    loadAll(); // Re-sync states dynamically
-  }
-
-  const pendingOrders = orders.filter(o => o.status === "pending").length;
-  const totalRevenue = orders.filter(o => o.status === "accepted" || o.status === "completed").reduce((sum, o) => sum + (o.quantity_kg * o.price_per_kg), 0);
-
-  // Modal Render Interceptor Block
-  if (isModalOpen) {
-    return (
-      <LinkListingModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedRequest(null);
-        }}
-        selectedRequest={selectedRequest}
-        farmerListings={listings}
-        onSubmitOffer={handleSendOfferToSupabase}
-        theme={t}
-      />
-    );
-  }
-
-  if (editListing) return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: "28px 16px" }}>
-      <button onClick={() => setEditListing(null)} style={{ fontSize: 13, color: t.textMuted, background: "none", border: "none", marginBottom: 20 }}>← Back</button>
-      <h2 className="serif" style={{ fontSize: 24, marginBottom: 20 }}>Edit listing</h2>
-      <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 24, boxShadow: t.shadow }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Variety</label>
-            <select value={editListing.variety} onChange={e => setEditListing({ ...editListing, variety: e.target.value })} style={inp}>
-              {VARIETIES.map(v => <option key={v}>{v}</option>)}
-            </select></div>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Certification</label>
-            <select value={editListing.certification} onChange={e => setEditListing({ ...editListing, certification: e.target.value })} style={inp}>
-              {["None","GlobalG.A.P","KEPHIS","Organic","KS EAS 12"].map(c => <option key={c}>{c}</option>)}
-            </select></div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Quantity (kg)</label>
-            <input type="number" value={editListing.quantity_kg} onChange={e => setEditListing({ ...editListing, quantity_kg: e.target.value })} style={inp} /></div>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Price per kg (Ksh)</label>
-            <input type="number" value={editListing.price_per_kg} onChange={e => setEditListing({ ...editListing, price_per_kg: e.target.value })} style={inp} /></div>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Estimated harvest date</label>
-          <input type="date" value={editListing.harvest_date} onChange={e => setEditListing({ ...editListing, harvest_date: e.target.value })} style={inp} />
-        </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Description / Notes</label>
-          <textarea value={editListing.description || ""} onChange={e => setEditListing({ ...editListing, description: e.target.value })} rows={3} style={{ ...inp, resize: "none" }} />
-        </div>
-        <button onClick={saveEdit} style={{ ...btn(t.green, t.white), width: "100%" }}>Save changes</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ maxWidth: 800, margin: "0 auto", padding: "24px 16px 48px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 className="serif" style={{ fontSize: 28, color: t.text, marginBottom: 4 }}>Farmer Dashboard</h1>
-          <p style={{ fontSize: 13, color: t.textMuted }}>Manage your active harvests, orders and browse buyer demands.</p>
-        </div>
-        <div style={{ display: "flex", background: t.white, borderRadius: 12, padding: 4, border: `1px solid ${t.border}` }}>
-          <button onClick={() => setTab("listings")} style={{ background: tab === "listings" ? t.greenLight : "none", color: tab === "listings" ? t.greenDark : t.textMuted, border: "none", padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>
-            My Listings ({listings.length})
-          </button>
-          <button onClick={() => setTab("orders")} style={{ background: tab === "orders" ? t.greenLight : "none", color: tab === "orders" ? t.greenDark : t.textMuted, border: "none", padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-            Incoming Orders
-            {pendingOrders > 0 && <span style={{ background: t.green, color: "#fff", fontSize: 10, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{pendingOrders}</span>}
-          </button>
-          <button onClick={() => setTab("demands")} style={{ background: tab === "demands" ? t.greenLight : "none", color: tab === "demands" ? t.greenDark : t.textMuted, border: "none", padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>
-            Browse Buyer Requirements ({buyerRequirements.length})
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 32 }}>
-        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
-          <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4 }}>Total Revenue (Delivered)</div>
-          <div className="serif" style={{ fontSize: 24, fontWeight: 600, color: t.greenDark }}>Ksh {totalRevenue.toLocaleString()}</div>
-        </div>
-        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
-          <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4 }}>Active Crop Listings</div>
-          <div className="serif" style={{ fontSize: 24, fontWeight: 600, color: t.text }}>{listings.filter(l => l.is_active).length} lots</div>
-        </div>
-        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
-          <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4 }}>Total Contracts Order volume</div>
-          <div className="serif" style={{ fontSize: 24, fontWeight: 600, color: t.brown }}>{orders.reduce((sum, o) => sum + o.quantity_kg, 0).toLocaleString()} kg</div>
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: "center", padding: 48, color: t.textMuted }}>Loading panel metrics...</div>
-      ) : tab === "listings" ? (
-        listings.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-            <p style={{ color: t.textMuted, marginBottom: 16 }}>You haven't posted any avocado lots yet.</p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {listings.map(l => (
-              <div key={l.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", boxShadow: t.shadow }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{l.variety} Variety</span>
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: l.is_active ? t.greenLight : t.brownLight, color: l.is_active ? t.greenDark : t.textMuted, fontWeight: 500 }}>
-                      {l.is_active ? "🟢 Active on Market" : "⚫ Paused"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: t.textMuted, display: "flex", gap: 16, flexWrap: "wrap" }}>
-                    <span>📦 Volume: <strong>{l.quantity_kg?.toLocaleString()} kg</strong></span>
-                    <span>💰 Price: <strong>Ksh {l.price_per_kg}/kg</strong></span>
-                    <span>📅 Harvest: {l.harvest_date}</span>
-                    <span>🛡️ Certification: {l.certification}</span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => toggleActive(l)} style={{ ...btn("none", t.text, `1px solid ${t.border}`), padding: "8px 14px", fontSize: 12 }}>
-                    {l.is_active ? "Pause Listing" : "Activate"}
-                  </button>
-                  <button onClick={() => setEditListing(l)} style={{ ...btn("none", t.text, `1px solid ${t.border}`), padding: "8px 14px", fontSize: 12 }}>
-                    Edit Crop
-                  </button>
-                  <button onClick={() => deleteListing(l.id)} style={{ ...btn("none", "#EF4444", "none"), padding: "8px 14px", fontSize: 12 }}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      ) : tab === "orders" ? (
-        orders.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-            <p style={{ color: t.textMuted }}>No buyers have placed orders on your crop lots yet.</p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {orders.map(o => {
-              const col = STATUS_COLORS[o.status] || { bg: t.border, text: t.text };
-              return (
-                <div key={o.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 15 }}>Order from {o.profiles?.name || "Verified Buyer"}</span>
-                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: col.bg, color: col.text, fontWeight: 500, textTransform: "capitalize" }}>
-                          {o.status}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: t.textMuted }}>📞 Buyer Line: {o.profiles?.phone || "N/A"}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: t.greenDark }}>Ksh {(o.quantity_kg * o.price_per_kg).toLocaleString()}</div>
-                      <div style={{ fontSize: 11, color: t.textMuted }}>{o.quantity_kg} kg @ Ksh {o.price_per_kg}</div>
-                    </div>
-                  </div>
-                  {o.message && (
-                    <div style={{ padding: "10px 12px", background: t.cream, borderRadius: 8, fontSize: 13, color: t.text, marginBottom: 14, borderLeft: `3px solid ${t.brownMid}` }}>
-                      " {o.message} "
-                    </div>
-                  )}
-                  {o.status === "pending" && (
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button onClick={() => updateOrderStatus(o.id, "rejected")} style={{ ...btn("none", "#EF4444", `1px solid #FCA5A5`), padding: "6px 14px", fontSize: 12 }}>Decline Match</button>
-                      <button onClick={() => updateOrderStatus(o.id, "accepted")} style={{ ...btn(t.green, t.white), padding: "7px 16px", fontSize: 12 }}>Accept & Unlock Contacts</button>
-                    </div>
-                  )}
-                  {o.status === "accepted" && (
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: t.textMuted }}>Crop in fulfillment. Completed trading?</span>
-                      <button onClick={() => updateOrderStatus(o.id, "completed")} style={{ ...btn(t.brown, t.white), padding: "6px 14px", fontSize: 12 }}>Mark as Completed Order</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : (
-        buyerRequirements.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-            <p style={{ color: t.textMuted }}>No buyers have posted matching purchase targets yet.</p>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
-            {buyerRequirements.map(req => (
-              <div key={req.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: t.shadow }}>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, background: t.brownLight, color: t.brown, padding: "3px 12px", borderRadius: 99, fontWeight: 600 }}>{req.variety} Variety</span>
-                    <span style={{ fontSize: 12, color: t.textMuted }}>📍 {req.preferred_location || "Any Port"}</span>
-                  </div>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, color: t.text, marginBottom: 4 }}>{req.company_name}</h3>
-                  <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 12, lineHeight: "1.5" }}>{req.specifications || "Standard grade export specifications requested."}</p>
-                  
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: t.cream, padding: 10, borderRadius: 10, border: `1px solid ${t.border}` }}>
-                    <div>
-                      <span style={{ display: "block", fontSize: 10, color: t.textMuted }}>Target Price</span>
-                      <strong style={{ fontSize: 13, color: t.greenDark }}>Ksh {req.target_price_per_kg}/kg</strong>
-                    </div>
-                    <div>
-                      <span style={{ display: "block", fontSize: 10, color: t.textMuted }}>Min Contract Vol</span>
-                      <strong style={{ fontSize: 13, color: t.text }}>{req.min_quantity_kg?.toLocaleString()} kg</strong>
-                    </div>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {
-                    setSelectedRequest(req);
-                    setIsModalOpen(true);
-                  }} 
-                  style={{ ...btn(t.green, t.white), width: "100%", padding: "9px", fontSize: 13, borderRadius: 10, fontWeight: 600 }}
-                >
-                  Fulfill this Request →
-                </button>
-              </div>
-            ))}
-          </div>
-        )
-      )}
-    </div>
-  );
-}
-
 // ── Signup Form Component ─────────────────────────────────────
 function Signup({ setPage, setProfile }) {
   const [name, setName] = useState("");
@@ -972,7 +615,12 @@ function Signup({ setPage, setProfile }) {
     setLoading(false);
     if (err) { setError("Signup failed. Try again."); return; }
     setProfile(data);
-    setPage(data.role === "company" ? "company-dashboard" : data.role === "cooperative" ? "coop-dashboard" : "dashboard");
+    
+    // Clean Routing based on selected string
+    if (data.role === "company") setPage("company-dashboard");
+    else if (data.role === "cooperative") setPage("coop-dashboard");
+    else if (data.role === "buyer") setPage("home");
+    else setPage("dashboard");
   }
 
   return (
@@ -994,8 +642,8 @@ function Signup({ setPage, setProfile }) {
               <select value={role} onChange={e => setRole(e.target.value)} style={inp}>
                 <option value="farmer">🌱 Farmer</option>
                 <option value="cooperative">🤝 Cooperative</option>
-                <option value="buyer">🏪 Local Buyer</option>
-                <option value="company">🏢 Exporter / Company</option>
+                <option value="buyer">🏪 Local Buyer / Exporter</option>
+                <option value="company">🏢 Input / Product Supplier</option>
               </select></div>
           </div>
           {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
@@ -1004,7 +652,7 @@ function Signup({ setPage, setProfile }) {
           </button>
         </form>
         <p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
-          Already signed up? <button onClick={() => setPage("login")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSiz: 13 }}>Log in</button>
+          Already signed up? <button onClick={() => setPage("login")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Log in</button>
         </p>
       </div>
     </div>
@@ -1025,7 +673,12 @@ function Login({ setPage, setProfile }) {
     setLoading(false);
     if (err || !data) { setError("No active profile found matching that line."); return; }
     setProfile(data);
-    setPage(data.role === "company" ? "company-dashboard" : data.role === "cooperative" ? "coop-dashboard" : "dashboard");
+    
+    // Clean Routing mapping on database records
+    if (data.role === "company") setPage("company-dashboard");
+    else if (data.role === "cooperative") setPage("coop-dashboard");
+    else if (data.role === "buyer") setPage("home");
+    else setPage("dashboard");
   }
 
   return (
@@ -1109,14 +762,10 @@ function ListForm({ setPage, profile }) {
   );
 }
 
-// ── Root View Controller Page Wrapper ─────────────────────────────────
+// ── Root Wrapper ──────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("home");
   const [profile, setProfile] = useState(null);
-
-  useEffect(() => {
-    // Check initial session profile logic here if needed
-  }, []);
 
   const signOut = () => {
     setProfile(null);
@@ -1142,6 +791,9 @@ export default function App() {
         {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
+        {pageName === "buyer-dashboard" && profile?.role === "buyer" && (
+  <BuyerDashboard profile={profile} setPage={setPage} />
+)}
       </div>
     </>
   );
