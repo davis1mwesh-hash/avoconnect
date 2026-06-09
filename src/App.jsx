@@ -597,26 +597,21 @@ function ListingDetail({ listing: l, setPage, profile }) {
 }
 
 // ── Signup Form Component ─────────────────────────────────────
-function Signup({ setPage, setProfile }) {
-  const [name, setName] = useState("");
+function Login({ setPage, setProfile }) {
   const [phone, setPhone] = useState("");
-  const [county, setCounty] = useState("Nakuru");
-  const [role, setRole] = useState("farmer");
+  const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSignup(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (!name || !phone) { setError("Fill in all fields."); return; }
+    if (!phone || !pin) { setError("Enter your phone number and PIN."); return; }
     setLoading(true); setError("");
-    const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
-    if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
-    const { data, error: err } = await supabase.from("profiles").insert({ name, phone, county, role, verified: true }).select().single();
+    const { data, error: err } = await supabase.from("profiles").select("*").eq("phone", phone).maybeSingle();
     setLoading(false);
-    if (err) { setError("Signup failed. Try again."); return; }
+    if (err || !data) { setError("No active profile found matching that number."); return; }
+    if (data.pin && data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
     setProfile(data);
-    
-    // Clean Routing based on selected string
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
     else if (data.role === "buyer") setPage("home");
@@ -624,35 +619,22 @@ function Signup({ setPage, setProfile }) {
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "60px auto", padding: "0 16px" }}>
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
       <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 32, boxShadow: t.shadow }}>
-        <h2 className="serif" style={{ fontSize: 26, marginBottom: 6, textAlign: "center" }}>Create account</h2>
-        <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 24, textAlign: "center" }}>Direct digital integration into Kenya's avocado grid.</p>
-        <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Full Name / Corporate Title</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., David Kariuki" style={inp} /></div>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Phone Number</label>
+        <h2 className="serif" style={{ fontSize: 26, marginBottom: 6, textAlign: "center" }}>Log back in</h2>
+        <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 24, textAlign: "center" }}>Access your farm configurations and active tenders.</p>
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Registered Phone Number</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g., 0712345678" style={inp} /></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County Base</label>
-              <select value={county} onChange={e => setCounty(e.target.value)} style={inp}>
-                {COUNTIES.map(c => <option key={c}>{c}</option>)}
-              </select></div>
-            <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Platform Role</label>
-              <select value={role} onChange={e => setRole(e.target.value)} style={inp}>
-                <option value="farmer">🌱 Farmer</option>
-                <option value="cooperative">🤝 Cooperative</option>
-                <option value="buyer">🏪 Local Buyer / Exporter</option>
-                <option value="company">🏢 Input / Product Supplier</option>
-              </select></div>
-          </div>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Your 4-Digit PIN</label>
+            <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="••••" style={inp} /></div>
           {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ ...btn(t.green, t.white), marginTop: 8 }}>
-            {loading ? "Registering account…" : "Open account"}
+            {loading ? "Authorizing…" : "Log in"}
           </button>
         </form>
         <p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
-          Already signed up? <button onClick={() => setPage("login")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Log in</button>
+          New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
         </p>
       </div>
     </div>
