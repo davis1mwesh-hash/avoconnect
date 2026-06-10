@@ -667,19 +667,19 @@ if (pin !== confirmPin) { setError("PINs do not match. Please try again."); retu
 // ── Login Form Component ──────────────────────────────────────
 function Login({ setPage, setProfile }) {
   const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleLogin(e) {
     e.preventDefault();
-    if (!phone) { setError("Enter your registered phone line."); return; }
+    if (!phone || !pin) { setError("Enter your phone number and PIN."); return; }
     setLoading(true); setError("");
     const { data, error: err } = await supabase.from("profiles").select("*").eq("phone", phone).maybeSingle();
     setLoading(false);
-    if (err || !data) { setError("No active profile found matching that line."); return; }
+    if (err || !data) { setError("No active profile found matching that number."); return; }
+    if (data.pin && data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
     setProfile(data);
-    
-    // Clean Routing mapping on database records
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
     else if (data.role === "buyer") setPage("home");
@@ -692,31 +692,25 @@ function Login({ setPage, setProfile }) {
         <h2 className="serif" style={{ fontSize: 26, marginBottom: 6, textAlign: "center" }}>Log back in</h2>
         <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 24, textAlign: "center" }}>Access your farm configurations and active tenders.</p>
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Registered Phone Line</label>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Registered Phone Number</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g., 0712345678" style={inp} /></div>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Your 4-Digit PIN</label>
+            <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="••••" style={inp} /></div>
           {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ ...btn(t.green, t.white), marginTop: 8 }}>
-            {loading ? "Authorizing line…" : "Secure log in"}
+            {loading ? "Authorizing…" : "Log in"}
           </button>
         </form>
-<p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
-  New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
-</p>
-<div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
-  <p style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>Forgot your PIN?</p>
-  <a 
-    href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-  >
-    <span>💬</span> 254710701013
-  </a>
-</div>
-      </div>
-    </div>
-  );
-}
+        <p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
+          New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
+        </p>
+        <div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
+          <p style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>Forgot your PIN?</p>
+          
+            href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 60
 
 // ── Create/Post Listing Form ──────────────────────────────────
 function ListForm({ setPage, profile }) {
