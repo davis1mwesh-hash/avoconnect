@@ -727,8 +727,8 @@ function Login({ setPage, setProfile }) {
     const { data, error: err } = await supabase.from("profiles").select("*").eq("phone", phone).maybeSingle();
     setLoading(false);
     if (err || !data) { setError("No active profile found matching that number."); return; }
-    if (data.pin && data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
     if (!data.pin) { setPage({ name: "set-pin", data }); return; }
+if (data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
     setProfile(data);
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
