@@ -707,7 +707,7 @@ function Login({ setPage, setProfile }) {
         <div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
           <p style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>Forgot your PIN?</p>
           
-            href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
+          href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
             target="_blank"
             rel="noopener noreferrer"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
@@ -715,7 +715,10 @@ function Login({ setPage, setProfile }) {
             <span>💬</span> Contact Support on WhatsApp
           </a>
         </div>
-
+      </div>
+    </div>
+  );
+}
 // ── Create/Post Listing Form ──────────────────────────────────
 function ListForm({ setPage, profile }) {
   const [variety, setVariety] = useState("Hass");
