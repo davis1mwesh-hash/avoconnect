@@ -663,6 +663,55 @@ if (pin !== confirmPin) { setError("PINs do not match. Please try again."); retu
     </div>
   );
 }
+// ── Set PIN Component ─────────────────────────────────────────
+function SetPin({ userData, setPage, setProfile }) {
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSetPin(e) {
+    e.preventDefault();
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setError("PIN must be exactly 4 digits."); return; }
+    if (pin !== confirmPin) { setError("PINs do not match. Please try again."); return; }
+    setLoading(true);
+    const { error: err } = await supabase.from("profiles").update({ pin }).eq("id", userData.id);
+    setLoading(false);
+    if (err) { setError("Failed to set PIN. Try again."); return; }
+    const updatedProfile = { ...userData, pin };
+    setProfile(updatedProfile);
+    if (updatedProfile.role === "company") setPage("company-dashboard");
+    else if (updatedProfile.role === "cooperative") setPage("coop-dashboard");
+    else if (updatedProfile.role === "buyer") setPage("home");
+    else setPage("dashboard");
+  }
+
+  return (
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 16px" }}>
+      <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 32, boxShadow: t.shadow }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
+          <h2 className="serif" style={{ fontSize: 24, marginBottom: 6 }}>Set Your PIN</h2>
+          <p style={{ fontSize: 13, color: t.textMuted }}>Welcome back {userData.name}! For your security, please set a 4-digit PIN for future logins.</p>
+        </div>
+        <form onSubmit={handleSetPin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Set 4-Digit PIN</label>
+            <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g., 1234" style={inp} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Confirm PIN</label>
+            <input type="password" maxLength={4} value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Re-enter PIN" style={inp} />
+          </div>
+          {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{ ...btn(t.green, t.white), marginTop: 8 }}>
+            {loading ? "Saving PIN…" : "Set PIN & Continue"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // ── Login Form Component ──────────────────────────────────────
 function Login({ setPage, setProfile }) {
@@ -679,6 +728,7 @@ function Login({ setPage, setProfile }) {
     setLoading(false);
     if (err || !data) { setError("No active profile found matching that number."); return; }
     if (data.pin && data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
+    if (!data.pin) { setPage({ name: "set-pin", data }); return; }
     setProfile(data);
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
@@ -801,6 +851,7 @@ export default function App() {
         {pageName === "home" && <Home setPage={setPage} />}
         {pageName === "signup" && <Signup setPage={setPage} setProfile={setProfile} />}
         {pageName === "login" && <Login setPage={setPage} setProfile={setProfile} />}
+        {pageName === "set-pin" && pageData && <SetPin userData={pageData} setPage={setPage} setProfile={setProfile} />}
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "listing" && pageData && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
