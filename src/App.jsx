@@ -600,6 +600,7 @@ function Signup({ setPage, setProfile }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
+const [confirmPin, setConfirmPin] = useState("");
   const [county, setCounty] = useState("Nakuru");
   const [role, setRole] = useState("farmer");
   const [loading, setLoading] = useState(false);
@@ -609,12 +610,13 @@ function Signup({ setPage, setProfile }) {
     e.preventDefault();
     if (!name || !phone || !pin) { setError("Fill in all fields including PIN."); return; }
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setError("PIN must be exactly 4 digits."); return; }
+if (pin !== confirmPin) { setError("PINs do not match. Please try again."); return; }
     setLoading(true); setError("");
     const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
     if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
     const { data, error: err } = await supabase.from("profiles").insert({ name, phone, pin, county, role, verified: true }).select().single();
     setLoading(false);
-    if (err) { setError("Signup failed. Try again."); return; }
+    if (err) { console.error("Signup error:", err); setError("Signup failed: " + err.message); return; }
     setProfile(data);
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
@@ -632,8 +634,10 @@ function Signup({ setPage, setProfile }) {
             <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., David Kariuki" style={inp} /></div>
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Phone Number</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g., 0712345678" style={inp} /></div>
-          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Set 4-Digit PIN</label>
-            <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g., 1234" style={inp} /></div>
+         <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Set 4-Digit PIN</label>
+  <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g., 1234" style={inp} /></div>
+<div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Confirm PIN</label>
+  <input type="password" maxLength={4} value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Re-enter PIN" style={inp} /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County Base</label>
               <select value={county} onChange={e => setCounty(e.target.value)} style={inp}>
@@ -695,9 +699,20 @@ function Login({ setPage, setProfile }) {
             {loading ? "Authorizing line…" : "Secure log in"}
           </button>
         </form>
-        <p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
-          New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
-        </p>
+<p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
+  New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
+</p>
+<div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
+  <p style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>Forgot your PIN?</p>
+  <a 
+    href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+  >
+    <span>💬</span> 254710701013
+  </a>
+</div>
       </div>
     </div>
   );
