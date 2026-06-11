@@ -99,27 +99,31 @@ async function closeRequirement(id) {
   }
 
   async function broadcastRequirement(e) {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.from("buyer_requirements").insert({
-      buyer_id: profile.id,
-      company_name: profile.name,
-      variety: formData.variety,
-      delivery_location: formData.location,
-      target_price_per_kg: Number(formData.price),
-      quantity_required_kg: Number(formData.volume),
-      additional_notes: formData.notes,
-      specifications: formData.notes
-    });
-    if (error) {
-      alert("Broadcasting failed: " + error.message);
-    } else {
-      alert("Requirement broadcasted successfully!");
-      setFormData({ variety: "Hass", location: "", price: "", volume: "", notes: "" });
-    }
-    setLoading(false);
+  e.preventDefault();
+  if (!profile.verified) { alert("Your account must be verified before broadcasting requirements."); return; }
+  if (!formData.location) { alert("Please enter a target buying location."); return; }
+  if (!formData.price || Number(formData.price) <= 0) { alert("Please enter a valid target price."); return; }
+  if (!formData.volume || Number(formData.volume) <= 0) { alert("Please enter a valid minimum volume."); return; }
+  setLoading(true);
+  const { error } = await supabase.from("buyer_requirements").insert({
+    buyer_id: profile.id,
+    company_name: profile.name,
+    variety: formData.variety,
+    delivery_location: formData.location,
+    target_price_per_kg: Number(formData.price),
+    quantity_required_kg: Number(formData.volume),
+    additional_notes: formData.notes,
+    specifications: formData.notes
+  });
+  if (error) {
+    alert("Broadcasting failed: " + error.message);
+  } else {
+    alert("Requirement broadcasted successfully!");
+    setFormData({ variety: "Hass", location: "", price: "", volume: "", notes: "" });
+    fetchRequirements();
   }
-
+  setLoading(false);
+}
   const pendingPitches = pitches.filter(p => p.status === "pending").length;
 
   const STATUS_COLORS = {
@@ -136,7 +140,7 @@ async function closeRequirement(id) {
         <p style={{ color: t.textMuted, fontSize: 14, marginBottom: 20, lineHeight: 1.7 }}>
           Your buyer account is awaiting admin verification. This usually takes 24 hours. You will be able to broadcast requirements and place orders once verified.
         </p>
-        
+
         <a
       href="https://wa.me/254710701013?text=Hi%20AvoConnect%2C%20I%20just%20signed%20up%20as%20a%20buyer%20and%20need%20verification."
           target="_blank"
