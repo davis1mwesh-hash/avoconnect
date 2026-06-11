@@ -12,6 +12,7 @@ export default function BuyerMarketplace({ buyerRequirements = [], theme, onCont
     cream: "#FDFAF5",
     greenLight: "#EAF4EE"
   };
+  
   return (
     <div style={{ padding: "24px 0" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: t.text }}>

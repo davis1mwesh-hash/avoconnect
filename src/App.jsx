@@ -603,6 +603,8 @@ function Signup({ setPage, setProfile }) {
 const [confirmPin, setConfirmPin] = useState("");
   const [county, setCounty] = useState("Nakuru");
   const [role, setRole] = useState("farmer");
+  const [regNumber, setRegNumber] = useState("");
+  const [kraPin, setKraPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -611,10 +613,16 @@ const [confirmPin, setConfirmPin] = useState("");
     if (!name || !phone || !pin) { setError("Fill in all fields including PIN."); return; }
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setError("PIN must be exactly 4 digits."); return; }
 if (pin !== confirmPin) { setError("PINs do not match. Please try again."); return; }
+if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives must provide Registration Number and KRA PIN."); return; }
     setLoading(true); setError("");
     const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
     if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
-    const { data, error: err } = await supabase.from("profiles").insert({ name, phone, pin, county, role, verified: true }).select().single();
+    const { data, error: err } = await supabase.from("profiles").insert({
+      name, phone, pin, county, role,
+      verified: role === "cooperative" ? false : true,
+      reg_number: role === "cooperative" ? regNumber : null,
+      kra_pin: role === "cooperative" ? kraPin : null,
+    }).select().single();
     setLoading(false);
     if (err) { console.error("Signup error:", err); setError("Signup failed: " + err.message); return; }
     setProfile(data);
@@ -651,6 +659,21 @@ if (pin !== confirmPin) { setError("PINs do not match. Please try again."); retu
                 <option value="company">🏢 Input / Product Supplier</option>
               </select></div>
           </div>
+          {role === "cooperative" && (
+            <>
+              <div>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Cooperative Registration Number *</label>
+                <input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="e.g. CPO/2024/1234" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>KRA PIN *</label>
+                <input value={kraPin} onChange={e => setKraPin(e.target.value)} placeholder="e.g. A123456789B" style={inp} />
+              </div>
+              <div style={{ padding: "10px 14px", background: t.amberLight, borderRadius: 8 }}>
+                <p style={{ fontSize: 12, color: t.amberDark }}>⏳ Cooperative accounts require admin verification before you can list avocados.</p>
+              </div>
+            </>
+          )}
           {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ ...btn(t.green, t.white), marginTop: 8 }}>
             {loading ? "Registering account…" : "Open account"}
