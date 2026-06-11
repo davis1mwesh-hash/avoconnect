@@ -619,7 +619,7 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
     if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
     const { data, error: err } = await supabase.from("profiles").insert({
       name, phone, pin, county, role,
-      verified: role === "cooperative" ? false : true,
+      verified: (role === "cooperative" || role === "buyer") ? false : true,
       reg_number: role === "cooperative" ? regNumber : null,
       kra_pin: role === "cooperative" ? kraPin : null,
     }).select().single();

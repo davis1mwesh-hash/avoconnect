@@ -128,6 +128,26 @@ async function closeRequirement(id) {
     rejected: { bg: "#FEE2E2", text: "#991B1B" },
   };
 
+  if (!profile.verified) return (
+    <div style={{ maxWidth: 500, margin: "80px auto", padding: "0 16px", textAlign: "center" }}>
+      <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 40, boxShadow: t.shadow }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <h2 className="serif" style={{ fontSize: 24, marginBottom: 8 }}>Verification Pending</h2>
+        <p style={{ color: t.textMuted, fontSize: 14, marginBottom: 20, lineHeight: 1.7 }}>
+          Your buyer account is awaiting admin verification. This usually takes 24 hours. You will be able to broadcast requirements and place orders once verified.
+        </p>
+        
+          href="https://wa.me/254710701013?text=Hi%20AvoConnect%2C%20I%20just%20signed%20up%20as%20a%20buyer%20and%20need%20verification."
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+        >
+          <span>💬</span> Contact Support to Speed Up Verification
+        </a>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ maxWidth: 800, margin: "40px auto", padding: "0 16px" }}>
       <div style={{ marginBottom: 28 }}>
