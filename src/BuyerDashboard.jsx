@@ -137,7 +137,7 @@ async function closeRequirement(id) {
           Your buyer account is awaiting admin verification. This usually takes 24 hours. You will be able to broadcast requirements and place orders once verified.
         </p>
         
-          href="https://wa.me/254710701013?text=Hi%20AvoConnect%2C%20I%20just%20signed%20up%20as%20a%20buyer%20and%20need%20verification."
+      href="https://wa.me/254710701013?text=Hi%20AvoConnect%2C%20I%20just%20signed%20up%20as%20a%20buyer%20and%20need%20verification."
           target="_blank"
           rel="noopener noreferrer"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
