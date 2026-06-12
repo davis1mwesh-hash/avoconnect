@@ -1,28 +1,14 @@
-import { useState } from "react";
+import { supabase } from "./App";
 
-async function askGroq(prompt) {
-  const key = import.meta.env.VITE_GROQ_API_KEY;
-  if (!key) throw new Error("VITE_GROQ_API_KEY not set in .env.local");
-
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: 900,
-    }),
+async function askAI(prompt) {
+  const { data, error } = await supabase.functions.invoke('ask-ai', {
+    body: { query: prompt }
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || "Groq API error");
-  }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "No response received.";
+
+  if (error) throw new Error(error.message || "AI request failed");
+
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text || "No response received.";
 }
 
 const t = {
@@ -115,7 +101,7 @@ function InsightCard({ icon, title, subtitle, accentColor, accentLight, buttonLa
       </div>
       {result && !loading && (
         <div style={{ padding: "8px 20px 12px", borderTop: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: 11, color: t.muted }}>🤖 Powered by Groq AI · {new Date().toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span style={{ fontSize: 11, color: t.muted }}>🤖 Powered by AvoConnect AI · {new Date().toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}</span>
         </div>
       )}
     </div>
@@ -201,7 +187,7 @@ One clear action this farmer should take this week to maximize returns.
 
 Keep it practical and Kenya-specific. Use bullet points and bold key numbers.`;
     try {
-      const res = await askGroq(prompt);
+      const res = await askAI(prompt);
       setMarketResult(res);
     } catch (e) { setMarketError(e.message); }
     setMarketLoading(false);
@@ -234,7 +220,7 @@ Specific actions the farmer should take based on current weather.
 
 Keep advice Kenya-specific and practical. Use bullet points.`;
     try {
-      const res = await askGroq(prompt);
+      const res = await askAI(prompt);
       setWeatherResult(res);
     } catch (e) { setWeatherError(e.message); }
     setWeatherLoading(false);
@@ -271,7 +257,7 @@ Top 3 specific actions to move from low to high yield.
 
 Show all calculations clearly in Kenya Shillings.`;
     try {
-      const res = await askGroq(prompt);
+      const res = await askAI(prompt);
       setEstimateResult(res);
     } catch (e) { setEstimateError(e.message); }
     setEstimateLoading(false);
@@ -285,7 +271,7 @@ Show all calculations clearly in Kenya Shillings.`;
         <div>
           <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>AI Farm Intelligence</div>
           <div style={{ fontSize: 13, color: t.muted }}>
-            Powered by Groq AI · <strong>{county} County</strong> · {orchards.length} orchard{orchards.length !== 1 ? "s" : ""}, {totalTrees.toLocaleString()} trees
+            Powered by AvoConnect AI · <strong>{county} County</strong> · {orchards.length} orchard{orchards.length !== 1 ? "s" : ""}, {totalTrees.toLocaleString()} trees
           </div>
         </div>
       </div>
