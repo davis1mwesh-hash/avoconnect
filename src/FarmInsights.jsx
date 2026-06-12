@@ -8,9 +8,10 @@ async function askAI(prompt) {
 
   if (error) throw new Error(error.message || "AI request failed");
 
- console.log("AI RAW RESPONSE:", JSON.stringify(data));
-const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-return text || "No response received.";
+  console.log("AI RAW RESPONSE:", JSON.stringify(data));
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text || "No response received.";
+}
 
 const t = {
   green: "#1D9E75", greenDark: "#0F6E56", greenLight: "#E1F5EE",
