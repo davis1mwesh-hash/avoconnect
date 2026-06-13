@@ -46,7 +46,16 @@ const AGE_COLORS = {
   "21–40 yrs (mature)": { bg: "#EDE9FE", text: "#5B21B6" },
   "40+ yrs (old)": { bg: "#F3F4F6", text: "#374151" },
 };
-
+function calculateAgeRange(yearPlanted) {
+  if (!yearPlanted) return AGE_RANGES[0];
+  const age = new Date().getFullYear() - yearPlanted;
+  if (age <= 2) return "0–2 yrs (pre-bearing)";
+  if (age <= 5) return "3–5 yrs (early bearing)";
+  if (age <= 9) return "6–9 yrs (peak bearing)";
+  if (age <= 20) return "10–20 yrs (full bearing)";
+  if (age <= 40) return "21–40 yrs (mature)";
+  return "40+ yrs (old)";
+}
 function getActivity(value) {
   return ACTIVITY_TYPES.find(a => a.value === value) || ACTIVITY_TYPES[5];
 }
@@ -129,8 +138,10 @@ export default function FarmDiary({ profile, setPage }) {
     alert(`Year planted (${yearPlanted}) cannot be earlier than the orchard's establishment year (${selectedOrchard.year_planted}).`);
     return;
   }
+  const ageRange = calculateAgeRange(yearPlanted);
   const { data, error } = await supabase.from("tree_groups").insert({
-    ...groupForm,
+    variety: groupForm.variety,
+    age_range: ageRange,
     tree_count: Number(groupForm.tree_count),
     year_planted: yearPlanted,
     orchard_id: selectedOrchard.id,
@@ -497,13 +508,7 @@ async function addEntry() {
                 {VARIETIES.map(v => <option key={v}>{v}</option>)}
               </select>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Canopy Physiological Phase</label>
-              <select value={groupForm.age_range} onChange={e => setGroupForm({ ...groupForm, age_range: e.target.value })}
-                style={{ width: "100%", padding: "10px 12px", border: `1px solid ${theme.border}`, borderRadius: 10, fontSize: 14 }}>
-                {AGE_RANGES.map(r => <option key={r}>{r}</option>)}
-              </select>
-            </div>
+          
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 12, color: theme.textMuted, display: "block", marginBottom: 4 }}>Tree Stock Count</label>
