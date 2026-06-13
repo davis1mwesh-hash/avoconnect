@@ -122,12 +122,9 @@ export default function FarmDiary({ profile, setPage }) {
     setShowAddOrchard(false);
   }
 
-  async function addTreeGroup() {
-    async function addTreeGroup() {
+ async function addTreeGroup() {
   alert("profile.id = " + profile?.id);
   if (!groupForm.tree_count || !selectedOrchard) return;
-    
-    if (!groupForm.tree_count || !selectedOrchard) return;
     const { data, error } = await supabase.from("tree_groups").insert({
       ...groupForm,
       tree_count: Number(groupForm.tree_count),
