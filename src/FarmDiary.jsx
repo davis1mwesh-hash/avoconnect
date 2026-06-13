@@ -124,10 +124,15 @@ export default function FarmDiary({ profile, setPage }) {
 
  async function addTreeGroup() {
   if (!groupForm.tree_count || !selectedOrchard) return;
+  const yearPlanted = Number(groupForm.year_planted) || null;
+  if (yearPlanted && selectedOrchard.year_planted && yearPlanted < selectedOrchard.year_planted) {
+    alert(`Year planted (${yearPlanted}) cannot be earlier than the orchard's establishment year (${selectedOrchard.year_planted}).`);
+    return;
+  }
   const { data, error } = await supabase.from("tree_groups").insert({
     ...groupForm,
     tree_count: Number(groupForm.tree_count),
-    year_planted: Number(groupForm.year_planted) || null,
+    year_planted: yearPlanted,
     orchard_id: selectedOrchard.id,
     farmer_id: profile.id,
   }).select().single();
