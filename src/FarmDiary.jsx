@@ -123,8 +123,10 @@ export default function FarmDiary({ profile, setPage }) {
   }
 
   async function addTreeGroup() {
-    alert("profile.id = " + profile?.id);
+    async function addTreeGroup() {
+  alert("profile.id = " + profile?.id);
   if (!groupForm.tree_count || !selectedOrchard) return;
+    
     if (!groupForm.tree_count || !selectedOrchard) return;
     const { data, error } = await supabase.from("tree_groups").insert({
       ...groupForm,
@@ -158,28 +160,21 @@ export default function FarmDiary({ profile, setPage }) {
 
 async function addEntry() {
   if (!selectedOrchard) return;
-  console.log("DEBUG profile.id:", profile.id);
-  const { data: sessionData } = await supabase.auth.getSession();
-  console.log("DEBUG auth uid:", sessionData?.session?.user?.id);
   const { data, error } = await supabase.from("diary_entries").insert({
-
-  async function addEntry() {
-    if (!selectedOrchard) return;
-    const { data, error } = await supabase.from("diary_entries").insert({
-      ...entryForm,
-      phi_days: Number(entryForm.phi_days) || 0,
-      orchard_id: selectedOrchard.id,
-      farmer_id: profile.id,
-    }).select().single();
-    if (error) { alert(error.message); return; }
-    setEntries(prev => [data, ...prev]);
-    setEntryForm({ 
-      activity_type: "spraying", date: new Date().toISOString().split("T")[0], 
-      notes: "", quantity: "", product_used: "", photo_url: "", 
-      growth_stage: "dormant", phi_days: "0", target_pest_disease: "" 
-    });
-    setShowAddEntry(false);
-  }
+    ...entryForm,
+    phi_days: Number(entryForm.phi_days) || 0,
+    orchard_id: selectedOrchard.id,
+    farmer_id: profile.id,
+  }).select().single();
+  if (error) { alert(error.message); return; }
+  setEntries(prev => [data, ...prev]);
+  setEntryForm({ 
+    activity_type: "spraying", date: new Date().toISOString().split("T")[0], 
+    notes: "", quantity: "", product_used: "", photo_url: "", 
+    growth_stage: "dormant", phi_days: "0", target_pest_disease: "" 
+  });
+  setShowAddEntry(false);
+}
 
   async function deleteEntry(id) {
     if (!confirm("Delete this entry?")) return;
