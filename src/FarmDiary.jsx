@@ -123,20 +123,19 @@ export default function FarmDiary({ profile, setPage }) {
   }
 
  async function addTreeGroup() {
-  alert("profile.id = " + profile?.id);
   if (!groupForm.tree_count || !selectedOrchard) return;
-    const { data, error } = await supabase.from("tree_groups").insert({
-      ...groupForm,
-      tree_count: Number(groupForm.tree_count),
-      year_planted: Number(groupForm.year_planted) || null,
-      orchard_id: selectedOrchard.id,
-      farmer_id: profile.id,
-    }).select().single();
-    if (error) { alert(error.message); return; }
-    setTreeGroups(prev => [...prev, data]);
-    setGroupForm({ variety: "Hass", age_range: AGE_RANGES[0], tree_count: "", year_planted: "" });
-    setShowAddGroup(false);
-  }
+  const { data, error } = await supabase.from("tree_groups").insert({
+    ...groupForm,
+    tree_count: Number(groupForm.tree_count),
+    year_planted: Number(groupForm.year_planted) || null,
+    orchard_id: selectedOrchard.id,
+    farmer_id: profile.id,
+  }).select().single();
+  if (error) { alert(error.message); return; }
+  setTreeGroups(prev => [...prev, data]);
+  setGroupForm({ variety: "Hass", age_range: AGE_RANGES[0], tree_count: "", year_planted: "" });
+  setShowAddGroup(false);
+}
 
   async function deleteTreeGroup(id) {
     if (!confirm("Delete this group?")) return;
