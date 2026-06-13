@@ -123,6 +123,8 @@ export default function FarmDiary({ profile, setPage }) {
   }
 
   async function addTreeGroup() {
+    alert("profile.id = " + profile?.id);
+  if (!groupForm.tree_count || !selectedOrchard) return;
     if (!groupForm.tree_count || !selectedOrchard) return;
     const { data, error } = await supabase.from("tree_groups").insert({
       ...groupForm,
@@ -160,7 +162,7 @@ async function addEntry() {
   const { data: sessionData } = await supabase.auth.getSession();
   console.log("DEBUG auth uid:", sessionData?.session?.user?.id);
   const { data, error } = await supabase.from("diary_entries").insert({
-    
+
   async function addEntry() {
     if (!selectedOrchard) return;
     const { data, error } = await supabase.from("diary_entries").insert({
