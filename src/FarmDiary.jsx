@@ -154,6 +154,13 @@ export default function FarmDiary({ profile, setPage }) {
     return data.publicUrl;
   }
 
+async function addEntry() {
+  if (!selectedOrchard) return;
+  console.log("DEBUG profile.id:", profile.id);
+  const { data: sessionData } = await supabase.auth.getSession();
+  console.log("DEBUG auth uid:", sessionData?.session?.user?.id);
+  const { data, error } = await supabase.from("diary_entries").insert({
+    
   async function addEntry() {
     if (!selectedOrchard) return;
     const { data, error } = await supabase.from("diary_entries").insert({
