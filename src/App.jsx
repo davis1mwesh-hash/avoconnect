@@ -399,6 +399,7 @@ function Home({ setPage }) {
   const [search, setSearch] = useState("");
   const [variety, setVariety] = useState("All");
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ farmers: 0, buyers: 0, priceLow: null, priceHigh: null });
 
   useEffect(() => {
     async function load() {
@@ -413,10 +414,34 @@ function Home({ setPage }) {
       const { data } = await query;
       setListings(data || []);
       setLoading(false);
+
+      const prices = (data || []).map(l => l.price_per_kg).filter(Boolean);
+      setStats(prev => ({
+        ...prev,
+        priceLow: prices.length ? Math.min(...prices) : null,
+        priceHigh: prices.length ? Math.max(...prices) : null,
+      }));
     }
     load();
   }, [variety]);
 
+  useEffect(() => {
+    async function loadCounts() {
+      const { count: farmerCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "farmer");
+
+      const { count: buyerCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "buyer")
+        .eq("verified", true);
+
+      setStats(prev => ({ ...prev, farmers: farmerCount || 0, buyers: buyerCount || 0 }));
+    }
+    loadCounts();
+  }, []);
   const filtered = listings.filter(l =>
     l.county?.toLowerCase().includes(search.toLowerCase()) ||
     l.variety?.toLowerCase().includes(search.toLowerCase()) ||
@@ -452,7 +477,11 @@ function Home({ setPage }) {
 
       <div style={{ background: t.brownLight, borderBottom: `1px solid ${t.border}` }}>
         <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
-          {[["🌱 1,240+", "Registered farmers"], ["🏪 84", "Verified buyers"], ["📈 Ksh 28–38", "Price range today /kg"]].map(([val, label]) => (
+          {[
+  ["🌱 " + stats.farmers.toLocaleString() + "+", "Registered farmers"],
+  ["🏪 " + stats.buyers.toLocaleString(), "Verified buyers"],
+  ["📈 " + (stats.priceLow && stats.priceHigh ? `Ksh ${stats.priceLow}–${stats.priceHigh}` : "—"), "Price range today /kg"],
+].map(([val, label]) => (
             <div key={label} style={{ padding: "16px 0", textAlign: "center", borderRight: `1px solid ${t.border}` }}>
               <div className="serif" style={{ fontSize: 18, color: t.brown, marginBottom: 2 }}>{val}</div>
               <div style={{ fontSize: 11, color: t.textMuted, letterSpacing: ".3px" }}>{label}</div>
