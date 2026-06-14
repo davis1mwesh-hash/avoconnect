@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import BuyerSourcingTab from './BuyerSourcingTab';
 import { supabase } from "./App";
 const t = {
   green: "#2D7A4F", greenDark: "#1A5C35", greenLight: "#EAF4EE",
@@ -340,84 +339,59 @@ export default function CompanyDashboard({ profile, setPage }) {
         >
           🧪 Agricultural Resources
         </button>
-        <button 
-          onClick={() => setActiveTab("sourcing")}
-          style={{
-            padding: "10px 16px",
-            background: "none",
-            border: "none",
-            borderBottom: activeTab === "sourcing" ? `3px solid ${t.green}` : "3px solid transparent",
-            color: activeTab === "sourcing" ? t.greenDark : t.textMuted,
-            fontWeight: activeTab === "sourcing" ? 600 : 500,
-            fontSize: 14,
-            cursor: "pointer",
-            transition: "all 0.15s"
-          }}
-        >
-          💼 Buyer Sourcing Tenders
-        </button>
       </div>
 
-      {/* 4. Tab Content Router View */}
-      {activeTab === "sourcing" ? (
-        /* Render Buyer Tender Feature */
-        <BuyerSourcingTab userProfile={profile} />
-      ) : (
-        /* Render Original Resources Management Workspace */
-        <>
-          {/* Stats Deck */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 28 }}>
-            {[["Total", stats.total, "🌿", t.green], ["Approved", stats.approved, "✅", t.greenDark], ["Pending", stats.pending, "⏳", t.amber], ["Rejected", stats.rejected, "❌", t.red]].map(([label, val, icon, color]) => (
-              <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "16px 18px", boxShadow: t.shadow }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
-                <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, color, marginBottom: 2 }}>{val}</div>
-                <div style={{ fontSize: 12, color: t.textMuted }}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Resources List Cards */}
-          {loading ? (
-            <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
-          ) : resources.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
-              <p style={{ color: t.textMuted, marginBottom: 16 }}>No resources yet. Submit your first one.</p>
-              <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>+ Submit resource</button>
-            </div>
-          ) : resources.map(r => {
-            const ss = STATUS_STYLES[r.status] || STATUS_STYLES.pending;
-            return (
-              <div key={r.id} style={{ background: t.white, border: `1px solid ${r.status === "rejected" ? "#FCA5A5" : t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
-                <div style={{ display: "flex", justifycontent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: ss.bg, color: ss.color, fontWeight: 500 }}>{ss.label}</span>
-                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: t.brownLight, color: t.brown, fontWeight: 500 }}>{r.type}</span>
-                      {r.category && <span style={{ fontSize: 11, color: t.textMuted }}>· {r.category}</span>}
-                    </div>
-                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
-                    {r.description && <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 4 }}>{r.description.substring(0, 100)}{r.description.length > 100 ? "…" : ""}</p>}
-                    {r.admin_note && r.status === "rejected" && (
-                      <div style={{ background: t.redLight, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
-                        <span style={{ fontSize: 12, color: t.red }}>Admin note: {r.admin_note}</span>
-                      </div>
-                    )}
-                  </div>
-                  {r.photo_url && (
-                    <img src={r.photo_url} alt={r.title} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 10, marginLeft: 12, flexShrink: 0 }} />
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                  <button onClick={() => setEditResource(r)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 14px", fontSize: 12 }}>Edit</button>
-                  <button onClick={() => deleteResource(r.id)} style={{ ...btn("none", t.red, "1px solid #FCA5A5"), padding: "6px 14px", fontSize: 12 }}>Delete</button>
-                  <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 14px", fontSize: 12 }}>View page →</button>
-                </div>
-              </div>
-            );
-          })}
-        </>
-      )}
+     {/* Stats Deck */}
+<div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 28 }}>
+  {[["Total", stats.total, "🌿", t.green], ["Approved", stats.approved, "✅", t.greenDark], ["Pending", stats.pending, "⏳", t.amber], ["Rejected", stats.rejected, "❌", t.red]].map(([label, val, icon, color]) => (
+    <div key={label} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: "16px 18px", boxShadow: t.shadow }}>
+      <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+      <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, color, marginBottom: 2 }}>{val}</div>
+      <div style={{ fontSize: 12, color: t.textMuted }}>{label}</div>
     </div>
+  ))}
+</div>
+
+{/* Resources List Cards */}
+{loading ? (
+  <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+) : resources.length === 0 ? (
+  <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+    <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+    <p style={{ color: t.textMuted, marginBottom: 16 }}>No resources yet. Submit your first one.</p>
+    <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>+ Submit resource</button>
+  </div>
+) : resources.map(r => {
+  const ss = STATUS_STYLES[r.status] || STATUS_STYLES.pending;
+  return (
+    <div key={r.id} style={{ background: t.white, border: `1px solid ${r.status === "rejected" ? "#FCA5A5" : t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+      <div style={{ display: "flex", justifycontent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: ss.bg, color: ss.color, fontWeight: 500 }}>{ss.label}</span>
+            <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: t.brownLight, color: t.brown, fontWeight: 500 }}>{r.type}</span>
+            {r.category && <span style={{ fontSize: 11, color: t.textMuted }}>· {r.category}</span>}
+          </div>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
+          {r.description && <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 4 }}>{r.description.substring(0, 100)}{r.description.length > 100 ? "…" : ""}</p>}
+          {r.admin_note && r.status === "rejected" && (
+            <div style={{ background: t.redLight, borderRadius: 8, padding: "8px 12px", marginTop: 8 }}>
+              <span style={{ fontSize: 12, color: t.red }}>Admin note: {r.admin_note}</span>
+            </div>
+          )}
+        </div>
+        {r.photo_url && (
+          <img src={r.photo_url} alt={r.title} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 10, marginLeft: 12, flexShrink: 0 }} />
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button onClick={() => setEditResource(r)} style={{ ...btn("none", t.green, `1px solid ${t.green}`), padding: "6px 14px", fontSize: 12 }}>Edit</button>
+        <button onClick={() => deleteResource(r.id)} style={{ ...btn("none", t.red, "1px solid #FCA5A5"), padding: "6px 14px", fontSize: 12 }}>Delete</button>
+        <button onClick={() => setPage("resources")} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), padding: "6px 14px", fontSize: 12 }}>View page →</button>
+      </div>
+    </div>
+  );
+})}
+</div>
   );
 }
