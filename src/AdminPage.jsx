@@ -24,6 +24,7 @@ const TABS = [
   { key: "users",     label: "👥 All Users",   color: t.blue },
   { key: "no_shows",  label: "⚠️ No-shows",   color: t.red },
   { key: "resources", label: "🌿 Resources",   color: t.green },
+  { key: "pools",     label: "🤝 Pool Orders", color: t.purple },
   { key: "stats",     label: "📊 Stats",       color: t.purple },
 ];
 
@@ -686,6 +687,113 @@ function StatsTab() {
   );
 }
 
+// ── Pool Orders Tab ────────────────────────────────────────────
+function PoolOrdersTab() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+
+  useEffect(() => { load(); }, [filter]);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("pool_orders")
+      .select("*, constituency_pools(constituency, county, variety), profiles!pool_orders_buyer_id_fkey(name, phone)")
+      .eq("status", filter)
+      .order("created_at", { ascending: false });
+    setOrders(data || []);
+    setLoading(false);
+  }
+
+  async function updateStatus(order, status) {
+    await supabase.from("pool_orders").update({ status }).eq("id", order.id);
+
+    if (status === "accepted") {
+      const pool = order.constituency_pools;
+      const { data: poolRow } = await supabase.from("constituency_pools").select("*").eq("constituency", pool.constituency).single();
+      if (poolRow) {
+        const remaining = Math.max(0, (poolRow.total_kg || 0) - (order.quantity_kg || 0));
+        await supabase.from("constituency_pools").update({ total_kg: remaining }).eq("id", poolRow.id);
+      }
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from("pool_orders").update({ expires_at: expiresAt }).eq("id", order.id);
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id, type: "accepted",
+        title: "Pool order accepted! ✅",
+        message: `Your order for ${order.quantity_kg}kg from the ${pool.constituency} pool has been accepted. Admin will coordinate pickup with contributing farmers.`,
+      });
+    }
+    if (status === "rejected") {
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id, type: "rejected",
+        title: "Pool order declined ❌",
+        message: `Your order from the ${order.constituency_pools?.constituency} pool could not be fulfilled. Browse other listings on the marketplace.`,
+      });
+    }
+    if (status === "completed") {
+      await supabase.from("notifications").insert({
+        user_id: order.buyer_id, type: "completed",
+        title: "Pool order completed 🎉",
+        message: `Your order from the ${order.constituency_pools?.constituency} pool is complete. Thank you for trading on AvoConnect!`,
+      });
+    }
+    load();
+  }
+
+  const STATUS_COLORS_LOOKUP = {
+    pending: { bg: "#FEF3C7", text: "#92400E" },
+    accepted: { bg: "#D1FAE5", text: "#065F46" },
+    rejected: { bg: "#FEE2E2", text: "#991B1B" },
+    completed: { bg: "#E0E7FF", text: "#3730A3" },
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {["pending","accepted","completed","rejected"].map(s => (
+          <button key={s} onClick={() => setFilter(s)}
+            style={{ padding: "7px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer", border: "none", fontFamily: "Inter, sans-serif", fontWeight: filter === s ? 600 : 400, background: filter === s ? t.purple : t.brownLight, color: filter === s ? t.white : t.textMuted }}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+      ) : orders.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🤝</div>
+          <p style={{ color: t.textMuted }}>No {filter} pool orders.</p>
+        </div>
+      ) : orders.map(o => (
+        <div key={o.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>🤝 {o.constituency_pools?.constituency} Pool</div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>Buyer: {o.profiles?.name} · 📞 {o.profiles?.phone}</div>
+            </div>
+            <Badge label={o.status} bg={STATUS_COLORS_LOOKUP[o.status]?.bg} color={STATUS_COLORS_LOOKUP[o.status]?.text} />
+          </div>
+          <div style={{ background: t.cream, borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 13 }}>
+            {o.quantity_kg}kg {o.constituency_pools?.variety} · Ksh {o.price_per_kg}/kg · Total: Ksh {(o.quantity_kg * o.price_per_kg).toLocaleString()}
+            {o.message && <div style={{ fontStyle: "italic", color: t.textMuted, marginTop: 6 }}>"{o.message}"</div>}
+          </div>
+          {o.status === "pending" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => updateStatus(o, "rejected")} style={btn("none", t.red, "1px solid #FCA5A5")}>Decline</button>
+              <button onClick={() => updateStatus(o, "accepted")} style={{ ...btn(t.green, t.white), flex: 1 }}>Accept</button>
+            </div>
+          )}
+          {o.status === "accepted" && (
+            <button onClick={() => updateStatus(o, "completed")} style={{ ...btn("#6366F1", t.white), width: "100%" }}>Mark completed</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main AdminPage ─────────────────────────────────────────────
 export default function AdminPage({ profile }) {
   const [tab, setTab] = useState("pending");
@@ -739,6 +847,7 @@ export default function AdminPage({ profile }) {
       {tab === "users"     && <UsersTab />}
       {tab === "no_shows"  && <NoShowsTab />}
       {tab === "resources" && <ResourcesTab />}
+      {tab === "pools"     && <PoolOrdersTab />}
       {tab === "stats"     && <StatsTab />}
     </div>
   );
