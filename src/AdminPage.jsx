@@ -541,6 +541,10 @@ function StatsTab() {
       { count: noShows },
       { count: totalListings },
       { count: reviews },
+      { count: activePools },
+      { count: poolContributions },
+      { count: pendingPoolOrders },
+      { data: poolKgRows },
     ] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "farmer"),
@@ -555,9 +559,15 @@ function StatsTab() {
       supabase.from("no_shows").select("id", { count: "exact", head: true }),
       supabase.from("listings").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("reviews").select("id", { count: "exact", head: true }),
+      supabase.from("constituency_pools").select("id", { count: "exact", head: true }).gt("total_kg", 0),
+      supabase.from("pool_contributions").select("id", { count: "exact", head: true }).eq("status", "active"),
+      supabase.from("pool_orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("constituency_pools").select("total_kg"),
     ]);
 
-    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews });
+    const totalPooledKg = (poolKgRows || []).reduce((sum, p) => sum + (p.total_kg || 0), 0);
+
+    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews, activePools, poolContributions, pendingPoolOrders, totalPooledKg });
     setLoading(false);
   }
 
@@ -581,6 +591,8 @@ function StatsTab() {
     completed:    () => drillDown("Completed Orders", supabase.from("orders").select("id, quantity_kg, price_per_kg, status, created_at, profiles!orders_buyer_id_fkey(name), listings(variety)").eq("status", "completed").order("created_at", { ascending: false })),
     listings:     () => drillDown("Active Listings", supabase.from("listings").select("id, variety, county, price_per_kg, quantity_kg, profiles(name)").eq("is_active", true).order("created_at", { ascending: false })),
     reviews:      () => drillDown("Reviews Written", supabase.from("reviews").select("id, rating, comment, reviewer:profiles!reviews_reviewer_id_fkey(name), reviewee:profiles!reviews_reviewee_id_fkey(name)").order("created_at", { ascending: false })),
+    pools:        () => drillDown("Active Constituency Pools", supabase.from("constituency_pools").select("id, constituency, county, variety, total_kg, price_per_kg").gt("total_kg", 0).order("total_kg", { ascending: false })),
+    poolOrders:   () => drillDown("Pending Pool Orders", supabase.from("pool_orders").select("id, quantity_kg, price_per_kg, status, created_at, profiles!pool_orders_buyer_id_fkey(name), constituency_pools(constituency)").eq("status", "pending").order("created_at", { ascending: false })),
   };
 
   if (loading || !stats) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
@@ -636,6 +648,24 @@ function StatsTab() {
                     {row.comment && <div style={{ color: t.text, marginTop: 4, fontStyle: "italic" }}>"{row.comment}"</div>}
                   </div>
                 )}
+                {row.constituency && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>🤝 {row.constituency}</div>
+                      <div style={{ color: t.textMuted }}>📍 {row.county} · {row.variety}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontWeight: 600, color: t.greenDark }}>{row.total_kg?.toLocaleString()} kg</div>
+                      <div style={{ color: t.textMuted, fontSize: 12 }}>Ksh {row.price_per_kg || "TBD"}/kg</div>
+                    </div>
+                  </div>
+                )}
+                {row.constituency_pools && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{row.profiles?.name} → {row.constituency_pools?.constituency}</div>
+                    <div style={{ color: t.textMuted }}>{row.quantity_kg} kg · Ksh {(row.quantity_kg * row.price_per_kg).toLocaleString()} · <span style={{ textTransform: "capitalize" }}>{row.status}</span></div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -657,6 +687,10 @@ function StatsTab() {
         <StatCard icon="⚠️" label="No-shows" value={stats.noShows} color={t.amber} />
         <StatCard icon="🥑" label="Active listings" value={stats.totalListings} color={t.green} onClick={DRILLS.listings} />
         <StatCard icon="⭐" label="Reviews written" value={stats.reviews} color={t.purple} onClick={DRILLS.reviews} />
+        <StatCard icon="🤝" label="Active pools" value={stats.activePools} color={t.purple} onClick={DRILLS.pools} />
+        <StatCard icon="👨‍🌾" label="Pool contributors" value={stats.poolContributions} color={t.green} />
+        <StatCard icon="📬" label="Pending pool orders" value={stats.pendingPoolOrders} color={t.amber} onClick={DRILLS.poolOrders} />
+        <StatCard icon="⚖️" label="Total pooled kg" value={stats.totalPooledKg?.toLocaleString()} color={t.brown} />
       </div>
 
       {/* Platform health */}
