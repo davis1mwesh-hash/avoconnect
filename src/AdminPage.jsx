@@ -545,9 +545,7 @@ function StatsTab() {
       { count: totalListings },
       { count: reviews },
       { count: activePools },
-      { count: poolContributions },
       { count: pendingPoolOrders },
-      { data: poolKgRows },
     ] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "farmer"),
@@ -563,14 +561,10 @@ function StatsTab() {
       supabase.from("listings").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("reviews").select("id", { count: "exact", head: true }),
       supabase.from("constituency_pools").select("id", { count: "exact", head: true }).gt("total_kg", 0),
-      supabase.from("pool_contributions").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("pool_orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      supabase.from("constituency_pools").select("total_kg"),
     ]);
 
-    const totalPooledKg = (poolKgRows || []).reduce((sum, p) => sum + (p.total_kg || 0), 0);
-
-    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews, activePools, poolContributions, pendingPoolOrders, totalPooledKg });
+    setStats({ totalUsers, farmers, buyers, cooperatives, companies, verified, suspended, pending, totalOrders, completedOrders, noShows, totalListings, reviews, activePools, pendingPoolOrders });
     setLoading(false);
   }
 
@@ -737,9 +731,7 @@ function StatsTab() {
         <StatCard icon="🥑" label="Active listings" value={stats.totalListings} color={t.green} onClick={DRILLS.listings} />
         <StatCard icon="⭐" label="Reviews written" value={stats.reviews} color={t.purple} onClick={DRILLS.reviews} />
         <StatCard icon="🤝" label="Active pools" value={stats.activePools} color={t.purple} onClick={DRILLS.pools} />
-        <StatCard icon="👨‍🌾" label="Pool contributors" value={stats.poolContributions} color={t.green} />
         <StatCard icon="📬" label="Pending pool orders" value={stats.pendingPoolOrders} color={t.amber} onClick={DRILLS.poolOrders} />
-        <StatCard icon="⚖️" label="Total pooled kg" value={stats.totalPooledKg?.toLocaleString()} color={t.brown} />
       </div>
 
       {/* Platform health */}
