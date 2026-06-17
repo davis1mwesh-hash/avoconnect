@@ -522,6 +522,9 @@ function StatsTab() {
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState(null); 
   const [drillLoading, setDrillLoading] = useState(false);
+  const [expandedPool, setExpandedPool] = useState(null);
+  const [contributors, setContributors] = useState({});
+  const [contributorsLoading, setContributorsLoading] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -574,9 +577,25 @@ function StatsTab() {
   async function drillDown(title, query) {
     setDrillLoading(true);
     setDrill({ title, data: [] });
+    setExpandedPool(null);
+    setContributors({});
     const { data } = await query;
     setDrill({ title, data: data || [] });
     setDrillLoading(false);
+  }
+
+  async function toggleContributors(poolId) {
+    if (expandedPool === poolId) { setExpandedPool(null); return; }
+    setExpandedPool(poolId);
+    if (contributors[poolId]) return;
+    setContributorsLoading(true);
+    const { data } = await supabase
+      .from("pool_contributions")
+      .select("id, quantity_kg, variety, price_per_kg, harvest_date, status, created_at, profiles!pool_contributions_farmer_id_fkey(name, phone, county)")
+      .eq("pool_id", poolId)
+      .order("created_at", { ascending: false });
+    setContributors(prev => ({ ...prev, [poolId]: data || [] }));
+    setContributorsLoading(false);
   }
 
   const DRILLS = {
@@ -649,15 +668,45 @@ function StatsTab() {
                   </div>
                 )}
                 {row.constituency && (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, marginBottom: 2 }}>🤝 {row.constituency}</div>
-                      <div style={{ color: t.textMuted }}>📍 {row.county} · {row.variety}</div>
+                  <div>
+                    <div
+                      onClick={() => toggleContributors(row.id)}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>🤝 {row.constituency}</div>
+                        <div style={{ color: t.textMuted }}>📍 {row.county} · {row.variety}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: 600, color: t.greenDark }}>{row.total_kg?.toLocaleString()} kg</div>
+                        <div style={{ color: t.textMuted, fontSize: 12 }}>Ksh {row.price_per_kg || "TBD"}/kg</div>
+                      </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 600, color: t.greenDark }}>{row.total_kg?.toLocaleString()} kg</div>
-                      <div style={{ color: t.textMuted, fontSize: 12 }}>Ksh {row.price_per_kg || "TBD"}/kg</div>
+                    <div style={{ fontSize: 11, color: t.purple, marginTop: 6, fontWeight: 500 }}>
+                      {expandedPool === row.id ? "▲ Hide farmers" : "▼ Show contributing farmers"}
                     </div>
+                    {expandedPool === row.id && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>
+                        {contributorsLoading && !contributors[row.id] ? (
+                          <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>Loading farmers…</p>
+                        ) : (contributors[row.id] || []).length === 0 ? (
+                          <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>No farmer contributions found.</p>
+                        ) : (contributors[row.id] || []).map(c => (
+                          <div key={c.id} style={{ background: t.white, borderRadius: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${t.border}` }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 12 }}>{c.profiles?.name || "Unknown farmer"}</div>
+                                <div style={{ fontSize: 11, color: t.textMuted }}>📞 {c.profiles?.phone}</div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontWeight: 600, fontSize: 12, color: t.greenDark }}>{c.quantity_kg} kg</div>
+                                <div style={{ fontSize: 10, color: t.textMuted }}>{c.harvest_date}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {row.constituency_pools && (
