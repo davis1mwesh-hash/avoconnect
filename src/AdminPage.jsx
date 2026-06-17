@@ -767,18 +767,53 @@ function PoolOrdersTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("pending");
+  const [expandedOrder, setExpandedOrder] = useState(null);
+  const [contributors, setContributors] = useState({});
+  const [contributorsLoading, setContributorsLoading] = useState(false);
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); setExpandedOrder(null); }, [filter]);
 
   async function load() {
     setLoading(true);
     const { data } = await supabase
       .from("pool_orders")
-      .select("*, constituency_pools(constituency, county, variety), profiles!pool_orders_buyer_id_fkey(name, phone)")
+      .select("*, constituency_pools(id, constituency, county, variety), profiles!pool_orders_buyer_id_fkey(name, phone)")
       .eq("status", filter)
       .order("created_at", { ascending: false });
     setOrders(data || []);
     setLoading(false);
+  }
+
+  async function toggleContributors(order) {
+    if (expandedOrder === order.id) { setExpandedOrder(null); return; }
+    setExpandedOrder(order.id);
+    if (contributors[order.id]) return;
+    setContributorsLoading(true);
+    const { data } = await supabase
+      .from("pool_contributions")
+      .select("id, quantity_kg, variety, harvest_date, profiles!pool_contributions_farmer_id_fkey(name, phone)")
+      .eq("pool_id", order.constituency_pools?.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+    setContributors(prev => ({ ...prev, [order.id]: data || [] }));
+    setContributorsLoading(false);
+  }
+
+  function buildWhatsAppLink(farmerPhone, farmerName, order) {
+    const pool = order.constituency_pools;
+    const cleanPhone = farmerPhone.replace(/\D/g, "").replace(/^0/, "254");
+    const message =
+`Habari ${farmerName?.split(" ")[0] || ""}! 🥑
+
+Kuna mnunuzi (buyer) ameagiza avocados ${order.quantity_kg}kg za ${pool?.variety} kutoka kwenye pool ya ${pool?.constituency}.
+
+Bei: Ksh ${order.price_per_kg}/kg
+Buyer: ${order.profiles?.name}
+
+Tafadhali jiandae kuleta avocados zako. Tutawasiliana na maelezo zaidi ya mahali pa kukutana.
+
+— AvoConnect Admin`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
   }
 
   async function updateStatus(order, status) {
@@ -798,6 +833,9 @@ function PoolOrdersTab() {
         title: "Pool order accepted! ✅",
         message: `Your order for ${order.quantity_kg}kg from the ${pool.constituency} pool has been accepted. Admin will coordinate pickup with contributing farmers.`,
       });
+      // Auto-expand contributors so admin can immediately notify farmers
+      setExpandedOrder(order.id);
+      toggleContributors({ ...order, id: order.id, constituency_pools: pool });
     }
     if (status === "rejected") {
       await supabase.from("notifications").insert({
@@ -861,7 +899,39 @@ function PoolOrdersTab() {
             </div>
           )}
           {o.status === "accepted" && (
-            <button onClick={() => updateStatus(o, "completed")} style={{ ...btn("#6366F1", t.white), width: "100%" }}>Mark completed</button>
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button onClick={() => toggleContributors(o)} style={{ ...btn("none", t.purple, `1px solid ${t.purple}`), flex: 1 }}>
+                  {expandedOrder === o.id ? "▲ Hide farmers" : "📲 Notify contributing farmers"}
+                </button>
+                <button onClick={() => updateStatus(o, "completed")} style={{ ...btn("#6366F1", t.white), flex: 1 }}>Mark completed</button>
+              </div>
+              {expandedOrder === o.id && (
+                <div style={{ background: t.cream, borderRadius: 10, padding: 12, border: `1px solid ${t.border}` }}>
+                  <p style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
+                    Tap WhatsApp to send each farmer a pre-filled message about this order.
+                  </p>
+                  {contributorsLoading && !contributors[o.id] ? (
+                    <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>Loading farmers…</p>
+                  ) : (contributors[o.id] || []).length === 0 ? (
+                    <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>No contributing farmers found for this pool.</p>
+                  ) : (contributors[o.id] || []).map(c => (
+                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: t.white, borderRadius: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${t.border}` }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{c.profiles?.name || "Unknown farmer"}</div>
+                        <div style={{ fontSize: 11, color: t.textMuted }}>📞 {c.profiles?.phone} · {c.quantity_kg}kg contributed</div>
+                      </div>
+                      {c.profiles?.phone && (
+                        <a href={buildWhatsAppLink(c.profiles.phone, c.profiles.name, o)} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
+                          💬 WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       ))}
