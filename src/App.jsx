@@ -5,9 +5,9 @@ import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
 import Resources from "./Resources";
 import CompanyDashboard from "./CompanyDashboard";
+import CoopDashboard from "./CoopDashboard";
 import ConstituencyPicker from "./ConstituencyPicker";
 import { PoolCard, PoolDetail } from "./PoolComponents";
-import CoopDashboard from "./CoopDashboard";
 import LinkListingModal from "./LinkListingModal"; 
 import FarmerDashboard from "./FarmerDashboard";
 import BuyerDashboard from "./BuyerDashboard";
@@ -405,6 +405,8 @@ function SidebarSection({ label }) {
 // ── Home Marketplace ───────────────────────────────────────────
 function Home({ setPage }) {
   const [listings, setListings] = useState([]);
+  const [pools, setPools] = useState([]);
+  const [poolCounts, setPoolCounts] = useState({});
   const [search, setSearch] = useState("");
   const [variety, setVariety] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -422,6 +424,17 @@ function Home({ setPage }) {
       if (variety !== "All") query = query.eq("variety", variety);
       const { data } = await query;
       setListings(data || []);
+
+      const { data: poolData } = await supabase.from("constituency_pools").select("*").gt("total_kg", 0).eq("is_active", true);
+      setPools(poolData || []);
+      if (poolData?.length) {
+        const counts = {};
+        for (const p of poolData) {
+          const { count } = await supabase.from("pool_contributions").select("*", { count: "exact", head: true }).eq("pool_id", p.id).eq("status", "active");
+          counts[p.id] = count || 0;
+        }
+        setPoolCounts(counts);
+      }
       setLoading(false);
 
       const prices = (data || []).map(l => l.price_per_kg).filter(Boolean);
@@ -515,6 +528,10 @@ function Home({ setPage }) {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px,1fr))", gap: 16 }}>
+            {pools.map(p => (
+              <PoolCard key={p.id} pool={p} contributorCount={poolCounts[p.id] || 0}
+                onClick={() => setPage({ name: "pool", data: { pool: p, contributorCount: poolCounts[p.id] || 0 } })} />
+            ))}
             {filtered.map(l => (
               <div key={l.id} onClick={() => setPage({ name: "listing", data: l })}
                 style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, cursor: "pointer", transition: "box-shadow .2s, transform .2s", boxShadow: t.shadow }}
@@ -640,6 +657,7 @@ function Signup({ setPage, setProfile }) {
   const [pin, setPin] = useState("");
 const [confirmPin, setConfirmPin] = useState("");
   const [county, setCounty] = useState("Nakuru");
+  const [constituency, setConstituency] = useState("");
   const [role, setRole] = useState("farmer");
   const [regNumber, setRegNumber] = useState("");
   const [kraPin, setKraPin] = useState("");
@@ -652,11 +670,13 @@ const [confirmPin, setConfirmPin] = useState("");
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setError("PIN must be exactly 4 digits."); return; }
 if (pin !== confirmPin) { setError("PINs do not match. Please try again."); return; }
 if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives must provide Registration Number and KRA PIN."); return; }
+    if (role === "farmer" && !constituency) { setError("Please select your constituency."); return; }
     setLoading(true); setError("");
     const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
     if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
     const { data, error: err } = await supabase.from("profiles").insert({
       name, phone, pin, county, role,
+      constituency: role === "farmer" ? constituency : null,
       verified: (role === "cooperative" || role === "buyer") ? false : true,
       reg_number: role === "cooperative" ? regNumber : null,
       kra_pin: role === "cooperative" ? kraPin : null,
@@ -697,6 +717,19 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
                 <option value="company">🏢 Input / Product Supplier</option>
               </select></div>
           </div>
+          {role === "farmer" && (
+            <div>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Constituency *</label>
+              <ConstituencyPicker
+                value={constituency}
+                county={county}
+                onChange={(name) => setConstituency(name)}
+              />
+              <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
+                Used to pool your harvest with nearby small-scale farmers if under 500kg.
+              </p>
+            </div>
+          )}
           {role === "cooperative" && (
             <>
               <div>
@@ -841,19 +874,64 @@ function ListForm({ setPage, profile }) {
   const [desc, setDesc] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pooled, setPooled] = useState(false);
+  const POOL_THRESHOLD = 500;
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!qty || !price || !date) { setError("Fill in volume, target price and harvest date."); return; }
     setLoading(true);
+    const quantity = Number(qty);
+
+    // Small-scale farmers under threshold get pooled by constituency instead of listed individually
+    if (profile.role === "farmer" && quantity < POOL_THRESHOLD) {
+      if (!profile.constituency) {
+        setError("Your account doesn't have a constituency set. Contact support before listing under 500kg.");
+        setLoading(false);
+        return;
+      }
+      const { data: pool } = await supabase.from("constituency_pools").select("*").eq("constituency", profile.constituency).single();
+      if (!pool) { setError("Could not find your constituency pool. Contact support."); setLoading(false); return; }
+
+      const { error: contribErr } = await supabase.from("pool_contributions").insert({
+        pool_id: pool.id, farmer_id: profile.id, quantity_kg: quantity,
+        variety, price_per_kg: Number(price), harvest_date: date,
+      });
+      if (contribErr) { setError(contribErr.message); setLoading(false); return; }
+
+      const newTotal = (pool.total_kg || 0) + quantity;
+      await supabase.from("constituency_pools").update({
+        total_kg: newTotal, variety,
+        price_per_kg: pool.price_per_kg || Number(price),
+        updated_at: new Date().toISOString(),
+      }).eq("id", pool.id);
+
+      setLoading(false);
+      setPooled(true);
+      return;
+    }
+
     const { error: err } = await supabase.from("listings").insert({
-      farmer_id: profile.id, variety, quantity_kg: Number(qty), price_per_kg: Number(price),
+      farmer_id: profile.id, variety, quantity_kg: quantity, price_per_kg: Number(price),
       harvest_date: date, certification: cert, description: desc, county: profile.county, is_active: true
     });
     setLoading(false);
     if (err) { setError("Failed to list crop lot. Try again."); return; }
     setPage(profile.role === "cooperative" ? "coop-dashboard" : "dashboard");
   }
+
+  if (pooled) return (
+    <div style={{ maxWidth: 440, margin: "80px auto", padding: 32, textAlign: "center" }}>
+      <div style={{ fontSize: 56, marginBottom: 16 }}>🤝</div>
+      <h2 className="serif" style={{ fontSize: 26, marginBottom: 10 }}>Added to your constituency pool!</h2>
+      <p style={{ color: t.textMuted, fontSize: 15, marginBottom: 28, lineHeight: 1.7 }}>
+        Your {qty}kg of {variety} avocados have been pooled with other small-scale farmers in <strong>{profile.constituency}</strong>. Once a buyer orders from the pool, admin will coordinate pickup.
+      </p>
+      <button onClick={() => setPage(profile.role === "cooperative" ? "coop-dashboard" : "dashboard")} style={{ ...btn(t.green, t.white), padding: "12px 32px" }}>
+        Back to dashboard
+      </button>
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 480, margin: "40px auto", padding: "0 16px" }}>
@@ -879,6 +957,13 @@ function ListForm({ setPage, profile }) {
           </div>
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Estimated Harvest Window</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} /></div>
+          {profile.role === "farmer" && qty && Number(qty) < 500 && (
+            <div style={{ padding: "10px 14px", background: "#EDE9FE", borderRadius: 8 }}>
+              <p style={{ fontSize: 12, color: "#5B21B6" }}>
+                🤝 Under 500kg goes into your <strong>{profile.constituency || "constituency"}</strong> pool — combined with other small farmers to reach buyers needing bulk orders.
+              </p>
+            </div>
+          )}
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Quality details / Field notes (optional)</label>
             <textarea rows={3} placeholder="e.g., Average fruit sizes 16-22, oil content testing optimal. High tree hygiene." value={desc} onChange={e => setDesc(e.target.value)} style={{ ...inp, resize: "none" }} /></div>
           {error && <p style={{ fontSize: 12, color: "#EF4444" }}>{error}</p>}
@@ -924,6 +1009,7 @@ export default function App() {
         {pageName === "buyer-dashboard" && profile?.role === "buyer" && (
   <BuyerDashboard profile={profile} setPage={setPage} />
 )}
+        {pageName === "pool" && <PoolDetail pool={pageData?.pool} contributorCount={pageData?.contributorCount} setPage={setPage} profile={profile} />}
       </div>
     </>
   );
