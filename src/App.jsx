@@ -658,6 +658,7 @@ function Signup({ setPage, setProfile }) {
 const [confirmPin, setConfirmPin] = useState("");
   const [county, setCounty] = useState("Nakuru");
   const [constituency, setConstituency] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [role, setRole] = useState("farmer");
   const [regNumber, setRegNumber] = useState("");
   const [kraPin, setKraPin] = useState("");
@@ -671,12 +672,14 @@ const [confirmPin, setConfirmPin] = useState("");
 if (pin !== confirmPin) { setError("PINs do not match. Please try again."); return; }
 if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives must provide Registration Number and KRA PIN."); return; }
     if (role === "farmer" && !constituency) { setError("Please select your constituency."); return; }
+    if (role === "farmer" && !nationalId) { setError("Please enter your National ID number."); return; }
     setLoading(true); setError("");
     const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
     if (exists) { setError("An account with this phone number already exists."); setLoading(false); return; }
     const { data, error: err } = await supabase.from("profiles").insert({
       name, phone, pin, county, role,
       constituency: role === "farmer" ? constituency : null,
+      national_id: role === "farmer" ? nationalId : null,
       verified: (role === "cooperative" || role === "buyer") ? false : true,
       reg_number: role === "cooperative" ? regNumber : null,
       kra_pin: role === "cooperative" ? kraPin : null,
@@ -727,6 +730,15 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
               />
               <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
                 Used to pool your harvest with nearby small-scale farmers if under 500kg.
+              </p>
+            </div>
+          )}
+          {role === "farmer" && (
+            <div>
+              <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>National ID Number *</label>
+              <input value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="e.g. 32145678" style={inp} />
+              <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
+                Used to prevent duplicate registration if you're also added to a cooperative.
               </p>
             </div>
           )}
