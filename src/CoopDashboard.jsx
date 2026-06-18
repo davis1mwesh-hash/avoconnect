@@ -38,6 +38,7 @@ export default function CoopDashboard({ profile, setPage }) {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [county, setCounty] = useState(profile?.county || "");
   const [variety, setVariety] = useState("Hass");
   const [expectedKg, setExpectedKg] = useState("");
@@ -100,19 +101,56 @@ export default function CoopDashboard({ profile, setPage }) {
 
   async function handleAddMember(e) {
     e.preventDefault();
-    if (!name || !phone) { setError("Please enter name and phone."); return; }
+    if (!name || !phone || !nationalId) { setError("Please enter name, phone, and national ID."); return; }
     setSaving(true); setError("");
+
     const { data: foundCoop, error: coopErr } = await supabase
       .from("cooperatives").select("id").eq("admin_id", profile.id).maybeSingle();
     if (coopErr || !foundCoop) { setError("Could not find your cooperative."); setSaving(false); return; }
+
+    const { data: existingFarmer } = await supabase
+      .from("profiles")
+      .select("id, name, constituency")
+      .eq("role", "farmer")
+      .or(`national_id.eq.${nationalId},phone.eq.${phone}`)
+      .maybeSingle();
+
     const { data, error: insertErr } = await supabase
       .from("cooperative_members")
-      .insert({ name, phone, county: county || profile.county, variety, expected_kg: Number(expectedKg) || 0, cooperative_id: foundCoop.id })
+      .insert({ name, phone, national_id: nationalId, county: county || profile.county, variety, expected_kg: Number(expectedKg) || 0, cooperative_id: foundCoop.id })
       .select().single();
+
+    if (insertErr) { setSaving(false); setError("Error: " + insertErr.message); return; }
+
+    if (existingFarmer) {
+      await supabase
+        .from("pool_contributions")
+        .update({ status: "withdrawn" })
+        .eq("farmer_id", existingFarmer.id)
+        .eq("status", "active");
+
+      if (existingFarmer.constituency) {
+        const { data: pool } = await supabase
+          .from("constituency_pools").select("id").eq("constituency", existingFarmer.constituency).maybeSingle();
+        if (pool) {
+          const { data: remainingContribs } = await supabase
+            .from("pool_contributions").select("quantity_kg").eq("pool_id", pool.id).eq("status", "active");
+          const newTotal = (remainingContribs || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
+          await supabase.from("constituency_pools").update({ total_kg: newTotal }).eq("id", pool.id);
+        }
+      }
+
+      await supabase.from("notifications").insert({
+        user_id: existingFarmer.id,
+        type: "order",
+        title: "Moved to cooperative 🤝",
+        message: `You've been registered under a cooperative. Your individual pool contributions have been deactivated to avoid duplicate listings — your cooperative will now represent your harvest.`,
+      });
+    }
+
     setSaving(false);
-    if (insertErr) { setError("Error: " + insertErr.message); return; }
     setMembers(prev => [data, ...prev]);
-    setName(""); setPhone(""); setCounty(profile?.county || "");
+    setName(""); setPhone(""); setNationalId(""); setCounty(profile?.county || "");
     setVariety("Hass"); setExpectedKg(""); setError(""); setShowForm(false);
   }
 
@@ -206,6 +244,8 @@ export default function CoopDashboard({ profile, setPage }) {
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. DAVID MWENDA" style={inp} />
                 <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Phone Number *</label>
                 <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 0710701013" style={inp} />
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>National ID Number *</label>
+                <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="e.g. 32145678" style={inp} />
                 <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County</label>
                 <select value={county} onChange={e => setCounty(e.target.value)} style={inp}>
                   {COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -245,7 +285,7 @@ export default function CoopDashboard({ profile, setPage }) {
                     <div key={m.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: t.shadow }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 15, color: t.text }}>{m.name}</div>
-                        <div style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>📞 {m.phone} · 📍 {m.county}</div>
+                        <div style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>📞 {m.phone} · 🆔 {m.national_id || "—"} · 📍 {m.county}</div>
                         <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
                           <span style={{ fontSize: 11, background: t.greenLight, color: t.greenDark, padding: "2px 8px", borderRadius: 99, fontWeight: 500 }}>{m.variety}</span>
                           <span style={{ fontSize: 11, background: t.brownLight, color: t.brown, padding: "2px 8px", borderRadius: 99, fontWeight: 500 }}>{m.expected_kg?.toLocaleString()} kg expected</span>
