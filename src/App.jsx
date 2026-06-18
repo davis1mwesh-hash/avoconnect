@@ -728,18 +728,12 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
                 county={county}
                 onChange={(name) => setConstituency(name)}
               />
-              <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
-                Used to pool your harvest with nearby small-scale farmers if under 500kg.
-              </p>
             </div>
           )}
           {role === "farmer" && (
             <div>
               <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>National ID Number *</label>
               <input value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="e.g. 32145678" style={inp} />
-              <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
-                Used to prevent duplicate registration if you're also added to a cooperative.
-              </p>
             </div>
           )}
           {role === "cooperative" && (
