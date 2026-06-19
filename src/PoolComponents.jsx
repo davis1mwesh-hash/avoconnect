@@ -15,6 +15,7 @@ const t = {
   purple: "#8B5CF6", purpleLight: "#EDE9FE",
 };
 
+// ── Pool Card for Home/marketplace grid ─────────────────────────
 export function PoolCard({ pool, contributorCount, onClick }) {
   return (
     <div
@@ -52,6 +53,7 @@ export function PoolCard({ pool, contributorCount, onClick }) {
   );
 }
 
+// ── Pool Detail / Order page ─────────────────────────────────────
 export function PoolDetail({ pool, contributorCount, setPage, profile }) {
   const [qty, setQty] = useState(100);
   const [msg, setMsg] = useState("");
@@ -70,6 +72,7 @@ export function PoolDetail({ pool, contributorCount, setPage, profile }) {
 
     if (qty > pool.total_kg) { setError(`Only ${pool.total_kg.toLocaleString()} kg available in this pool.`); setLoading(false); return; }
 
+    const expiresAt = null; // expiry set on accept, same as regular orders
     const { error: err } = await supabase.from("pool_orders").insert({
       pool_id: pool.id, buyer_id: profile.id,
       quantity_kg: qty, price_per_kg: pool.price_per_kg || 0, message: msg,
