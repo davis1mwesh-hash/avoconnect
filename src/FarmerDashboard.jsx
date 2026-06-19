@@ -437,7 +437,7 @@ export default function FarmerDashboard({ setPage, profile }) {
             ))}
           </div>
         )
-      ) : (
+      ) : tab === "pitches" ? (
         // MY PITCHES TAB
         loadingPitches ? (
           <div style={{ textAlign: "center", padding: 48, color: t.textMuted }}>Loading your pitches...</div>
