@@ -881,6 +881,7 @@ function ListForm({ setPage, profile }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [pooled, setPooled] = useState(false);
+  const [qualityGrade, setQualityGrade] = useState("A");
   const POOL_THRESHOLD = 500;
 
   async function handleSubmit(e) {
@@ -901,7 +902,7 @@ function ListForm({ setPage, profile }) {
 
       const { error: contribErr } = await supabase.from("pool_contributions").insert({
         pool_id: pool.id, farmer_id: profile.id, quantity_kg: quantity,
-        variety, price_per_kg: Number(price), harvest_date: date,
+        variety, price_per_kg: Number(price), harvest_date: date, quality_grade: qualityGrade,
       });
       if (contribErr) { setError(contribErr.message); setLoading(false); return; }
 
@@ -964,11 +965,21 @@ function ListForm({ setPage, profile }) {
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Estimated Harvest Window</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} /></div>
           {profile.role === "farmer" && qty && Number(qty) < 500 && (
-            <div style={{ padding: "10px 14px", background: "#EDE9FE", borderRadius: 8 }}>
-              <p style={{ fontSize: 12, color: "#5B21B6" }}>
-                🤝 Under 500kg goes into your <strong>{profile.constituency || "constituency"}</strong> pool — combined with other small farmers to reach buyers needing bulk orders.
-              </p>
-            </div>
+            <>
+              <div style={{ padding: "10px 14px", background: "#EDE9FE", borderRadius: 8 }}>
+                <p style={{ fontSize: 12, color: "#5B21B6" }}>
+                  🤝 Under 500kg goes into your <strong>{profile.constituency || "constituency"}</strong> pool — combined with other small farmers to reach buyers needing bulk orders.
+                </p>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Quality Grade (self-reported)</label>
+                <select value={qualityGrade} onChange={e => setQualityGrade(e.target.value)} style={inp}>
+                  <option value="A">Grade A — Uniform size, no blemishes, export quality</option>
+                  <option value="B">Grade B — Good quality, minor blemishes, domestic market</option>
+                  <option value="C">Grade C — Mixed sizes, processing/oil extraction grade</option>
+                </select>
+              </div>
+            </>
           )}
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Quality details / Field notes (optional)</label>
             <textarea rows={3} placeholder="e.g., Average fruit sizes 16-22, oil content testing optimal. High tree hygiene." value={desc} onChange={e => setDesc(e.target.value)} style={{ ...inp, resize: "none" }} /></div>

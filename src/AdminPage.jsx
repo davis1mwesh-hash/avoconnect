@@ -791,12 +791,36 @@ function PoolOrdersTab() {
     setContributorsLoading(true);
     const { data } = await supabase
       .from("pool_contributions")
-      .select("id, quantity_kg, variety, harvest_date, profiles!pool_contributions_farmer_id_fkey(name, phone)")
+      .select("id, farmer_id, quantity_kg, variety, harvest_date, quality_grade, delivered, profiles!pool_contributions_farmer_id_fkey(name, phone)")
       .eq("pool_id", order.constituency_pools?.id)
       .eq("status", "active")
       .order("created_at", { ascending: false });
     setContributors(prev => ({ ...prev, [order.id]: data || [] }));
     setContributorsLoading(false);
+  }
+
+  async function markFarmerDelivery(order, contribution, delivered) {
+    await supabase.from("pool_contributions").update({ delivered, delivery_marked_at: new Date().toISOString() }).eq("id", contribution.id);
+
+    setContributors(prev => ({
+      ...prev,
+      [order.id]: (prev[order.id] || []).map(c => c.id === contribution.id ? { ...c, delivered } : c)
+    }));
+
+    if (!delivered) {
+      const farmerId = contribution.farmer_id;
+      const { data: farmerProfile } = await supabase.from("profiles").select("strikes").eq("id", farmerId).maybeSingle();
+      const newStrikes = (farmerProfile?.strikes || 0) + 1;
+      const suspend = newStrikes >= 2;
+      await supabase.from("profiles").update({ strikes: newStrikes, suspended: suspend }).eq("id", farmerId);
+      await supabase.from("notifications").insert({
+        user_id: farmerId, type: "rejected",
+        title: suspend ? "Account suspended ⛔" : "Pool delivery missed ⚠️",
+        message: suspend
+          ? "You've been suspended after 2 missed pool deliveries. Contact admin to appeal."
+          : `You were marked as a no-show for a pool delivery (${contribution.quantity_kg}kg). One more missed delivery will suspend your account.`,
+      });
+    }
   }
 
   function buildWhatsAppLink(farmerPhone, farmerName, order) {
@@ -902,35 +926,47 @@ Tafadhali jiandae kuleta avocados zako. Tutawasiliana na maelezo zaidi ya mahali
             <>
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <button onClick={() => toggleContributors(o)} style={{ ...btn("none", t.purple, `1px solid ${t.purple}`), flex: 1 }}>
-                  {expandedOrder === o.id ? "▲ Hide farmers" : "📲 Notify contributing farmers"}
+                  {expandedOrder === o.id ? "▲ Hide farmers" : "📲 Manage contributing farmers"}
                 </button>
-                <button onClick={() => updateStatus(o, "completed")} style={{ ...btn("#6366F1", t.white), flex: 1 }}>Mark completed</button>
               </div>
               {expandedOrder === o.id && (
-                <div style={{ background: t.cream, borderRadius: 10, padding: 12, border: `1px solid ${t.border}` }}>
+                <div style={{ background: t.cream, borderRadius: 10, padding: 12, border: `1px solid ${t.border}`, marginBottom: 10 }}>
                   <p style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
-                    Tap WhatsApp to send each farmer a pre-filled message about this order.
+                    Notify each farmer on WhatsApp, then mark Delivered or No-show once pickup is done.
                   </p>
                   {contributorsLoading && !contributors[o.id] ? (
                     <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>Loading farmers…</p>
                   ) : (contributors[o.id] || []).length === 0 ? (
                     <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>No contributing farmers found for this pool.</p>
                   ) : (contributors[o.id] || []).map(c => (
-                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: t.white, borderRadius: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${t.border}` }}>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>{c.profiles?.name || "Unknown farmer"}</div>
-                        <div style={{ fontSize: 11, color: t.textMuted }}>📞 {c.profiles?.phone} · {c.quantity_kg}kg contributed</div>
+                    <div key={c.id} style={{ background: t.white, borderRadius: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${t.border}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 12 }}>{c.profiles?.name || "Unknown farmer"} <span style={{ fontSize: 10, color: t.purple, background: t.purpleLight || "#EDE9FE", padding: "1px 6px", borderRadius: 6, marginLeft: 4 }}>Grade {c.quality_grade || "A"}</span></div>
+                          <div style={{ fontSize: 11, color: t.textMuted }}>📞 {c.profiles?.phone} · {c.quantity_kg}kg contributed</div>
+                        </div>
+                        {c.profiles?.phone && (
+                          <a href={buildWhatsAppLink(c.profiles.phone, c.profiles.name, o)} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
+                            💬
+                          </a>
+                        )}
                       </div>
-                      {c.profiles?.phone && (
-                        <a href={buildWhatsAppLink(c.profiles.phone, c.profiles.name, o)} target="_blank" rel="noopener noreferrer"
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
-                          💬 WhatsApp
-                        </a>
+                      {c.delivered === null || c.delivered === undefined ? (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => markFarmerDelivery(o, c, false)} style={{ flex: 1, padding: "6px", background: "none", border: "1px solid #FCA5A5", borderRadius: 6, color: t.red, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>❌ No-show</button>
+                          <button onClick={() => markFarmerDelivery(o, c, true)} style={{ flex: 1, padding: "6px", background: t.green, border: "none", borderRadius: 6, color: t.white, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>✅ Delivered</button>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: c.delivered ? t.green : t.red, padding: 4 }}>
+                          {c.delivered ? "✅ Delivered" : "❌ Marked no-show — strike applied"}
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
               )}
+              <button onClick={() => updateStatus(o, "completed")} style={{ ...btn("#6366F1", t.white), width: "100%" }}>Mark order completed</button>
             </>
           )}
         </div>

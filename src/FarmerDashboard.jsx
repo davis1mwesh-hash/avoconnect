@@ -27,6 +27,8 @@ export default function FarmerDashboard({ setPage, profile }) {
   const [orders, setOrders] = useState([]);
   const [demands, setDemands] = useState([]);
   const [myPitches, setMyPitches] = useState([]);
+  const [myPoolContributions, setMyPoolContributions] = useState([]);
+  const [loadingPool, setLoadingPool] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingDemands, setLoadingDemands] = useState(false);
   const [loadingPitches, setLoadingPitches] = useState(false);
@@ -72,6 +74,23 @@ export default function FarmerDashboard({ setPage, profile }) {
       console.error("Error fetching buyer requirements:", err);
     } finally {
       setLoadingDemands(false);
+    }
+  }
+
+  async function fetchMyPoolContributions() {
+    try {
+      setLoadingPool(true);
+      const { data, error } = await supabase
+        .from("pool_contributions")
+        .select("*, constituency_pools(constituency, county)")
+        .eq("farmer_id", profile.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setMyPoolContributions(data || []);
+    } catch (err) {
+      console.error("Error fetching pool contributions:", err);
+    } finally {
+      setLoadingPool(false);
     }
   }
 
@@ -268,6 +287,9 @@ export default function FarmerDashboard({ setPage, profile }) {
           <button onClick={() => { setTab("pitches"); fetchMyPitches(); }} style={{ background: tab === "pitches" ? t.greenLight : "none", color: tab === "pitches" ? t.greenDark : t.textMuted, border: "none", padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
             📤 My Pitches
             {pendingPitches > 0 && <span style={{ background: t.brown, color: "#fff", fontSize: 10, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{pendingPitches}</span>}
+          </button>
+          <button onClick={() => { setTab("mypool"); fetchMyPoolContributions(); }} style={{ background: tab === "mypool" ? t.greenLight : "none", color: tab === "mypool" ? t.greenDark : t.textMuted, border: "none", padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>
+            🤝 My Pool
           </button>
         </div>
       </div>
@@ -469,7 +491,52 @@ export default function FarmerDashboard({ setPage, profile }) {
             })}
           </div>
         )
-      )}
+      ) : tab === "mypool" ? (
+        loadingPool ? (
+          <div style={{ textAlign: "center", padding: 48, color: t.textMuted }}>Loading your pool contributions...</div>
+        ) : myPoolContributions.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+            <p style={{ fontSize: 24, marginBottom: 8 }}>🤝</p>
+            <p style={{ fontWeight: 600, marginBottom: 4 }}>No pool contributions yet</p>
+            <p style={{ color: t.textMuted, fontSize: 13 }}>List under 500kg and it'll automatically join your constituency pool here.</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {myPoolContributions.map(c => {
+              const gradeColors = { A: { bg: "#D1FAE5", text: "#065F46" }, B: { bg: "#FEF3C7", text: "#92400E" }, C: { bg: "#FEE2E2", text: "#991B1B" } };
+              const gc = gradeColors[c.quality_grade] || gradeColors.A;
+              return (
+                <div key={c.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>🤝 {c.constituency_pools?.constituency} Pool</span>
+                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: gc.bg, color: gc.text, fontWeight: 600 }}>Grade {c.quality_grade || "A"}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: t.textMuted }}>📍 {c.constituency_pools?.county} · {c.variety} · Harvest {c.harvest_date}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: t.greenDark }}>{c.quantity_kg} kg</div>
+                      <div style={{ fontSize: 11, color: t.textMuted }}>@ Ksh {c.price_per_kg}/kg</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>
+                    {c.status === "withdrawn" ? (
+                      <span style={{ fontSize: 12, color: t.textMuted }}>⤴️ Moved to cooperative registration</span>
+                    ) : c.delivered === true ? (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: t.green }}>✅ Delivered — sold to buyer</span>
+                    ) : c.delivered === false ? (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#EF4444" }}>❌ Marked as no-show by admin</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: t.amberDark }}>⏳ Pooled — waiting for a buyer order</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : null}
     </div>
   );
 }
