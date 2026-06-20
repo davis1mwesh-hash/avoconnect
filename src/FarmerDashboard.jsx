@@ -86,7 +86,19 @@ export default function FarmerDashboard({ setPage, profile }) {
         .eq("farmer_id", profile.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      setMyPoolContributions(data || []);
+
+      // For any reserved contribution, fetch its visit request expiry date
+      const reservedIds = (data || []).filter(c => c.status === "reserved").map(c => c.id);
+      let visitMap = {};
+      if (reservedIds.length > 0) {
+        const { data: visitLinks } = await supabase
+          .from("pool_visit_farmers")
+          .select("contribution_id, pool_visit_requests(expires_at, status)")
+          .in("contribution_id", reservedIds);
+        (visitLinks || []).forEach(v => { visitMap[v.contribution_id] = v.pool_visit_requests; });
+      }
+
+      setMyPoolContributions((data || []).map(c => ({ ...c, visitInfo: visitMap[c.id] || null })));
     } catch (err) {
       console.error("Error fetching pool contributions:", err);
     } finally {
@@ -523,6 +535,15 @@ export default function FarmerDashboard({ setPage, profile }) {
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>
                     {c.status === "withdrawn" ? (
                       <span style={{ fontSize: 12, color: t.textMuted }}>⤴️ Moved to cooperative registration</span>
+                    ) : c.status === "reserved" && c.visitInfo ? (
+                      <div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#5B21B6" }}>
+                          🔍 Reserved for inspection — buyer visiting before {new Date(c.visitInfo.expires_at).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}
+                        </span>
+                        <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
+                          A buyer has selected your harvest for a field visit. Admin will contact you on WhatsApp with the visit date and details.
+                        </p>
+                      </div>
                     ) : c.delivered === true ? (
                       <span style={{ fontSize: 12, fontWeight: 600, color: t.green }}>✅ Delivered — sold to buyer</span>
                     ) : c.delivered === false ? (

@@ -3,11 +3,15 @@ import { supabase } from "./App";
 
 export default function BuyerDashboard({ profile, setPage }) {
   const [tab, setTab] = useState("broadcast");
+  const [historyTab, setHistoryTab] = useState("orders");
   const [loading, setLoading] = useState(false);
   const [pitches, setPitches] = useState([]);
   const [loadingPitches, setLoadingPitches] = useState(false);
 const [requirements, setRequirements] = useState([]);
 const [loadingReqs, setLoadingReqs] = useState(false);
+const [myOrders, setMyOrders] = useState([]);
+const [myVisits, setMyVisits] = useState([]);
+const [loadingHistory, setLoadingHistory] = useState(false);
   const [formData, setFormData] = useState({
     variety: "Hass", location: "", price: "", volume: "", notes: ""
   });
@@ -63,6 +67,23 @@ const [loadingReqs, setLoadingReqs] = useState(false);
     .order("created_at", { ascending: false });
   setRequirements(data || []);
   setLoadingReqs(false);
+}
+
+async function fetchHistory() {
+  setLoadingHistory(true);
+  const [{ data: directOrders }, { data: poolOrders }, { data: visits }] = await Promise.all([
+    supabase.from("orders").select("*, listings(variety, county), profiles!orders_farmer_id_fkey(name, phone)").eq("buyer_id", profile.id).order("created_at", { ascending: false }),
+    supabase.from("pool_orders").select("*, constituency_pools(constituency, county, variety)").eq("buyer_id", profile.id).order("created_at", { ascending: false }),
+    supabase.from("pool_visit_requests").select("*, constituency_pools(constituency, county, variety)").eq("buyer_id", profile.id).order("created_at", { ascending: false }),
+  ]);
+  // Normalize direct orders + pool orders into one "orders" list, tagged by source
+  const normalizedOrders = [
+    ...(directOrders || []).map(o => ({ ...o, source: "direct", title: o.listings?.variety, location: o.listings?.county, contact: o.profiles })),
+    ...(poolOrders || []).map(o => ({ ...o, source: "pool", title: o.constituency_pools?.variety, location: o.constituency_pools?.constituency })),
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  setMyOrders(normalizedOrders);
+  setMyVisits(visits || []);
+  setLoadingHistory(false);
 }
 
 async function closeRequirement(id) {
@@ -170,6 +191,9 @@ async function closeRequirement(id) {
 </button>
 <button onClick={() => { setTab("requirements"); fetchRequirements(); }} style={{ background: tab === "requirements" ? t.greenLight : "none", color: tab === "requirements" ? t.greenDark : t.textMuted, border: "none", padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
   📋 My Requirements
+</button>
+<button onClick={() => { setTab("history"); fetchHistory(); }} style={{ background: tab === "history" ? t.greenLight : "none", color: tab === "history" ? t.greenDark : t.textMuted, border: "none", padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+  🧾 My Orders & Visits
 </button>
       </div>
 
@@ -303,6 +327,96 @@ async function closeRequirement(id) {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <button onClick={() => setHistoryTab("orders")} style={{ padding: "7px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer", border: "none", fontWeight: historyTab === "orders" ? 600 : 400, background: historyTab === "orders" ? t.green : t.brownLight, color: historyTab === "orders" ? t.white : t.textMuted }}>
+              📦 Direct Orders ({myOrders.length})
+            </button>
+            <button onClick={() => setHistoryTab("visits")} style={{ padding: "7px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer", border: "none", fontWeight: historyTab === "visits" ? 600 : 400, background: historyTab === "visits" ? t.green : t.brownLight, color: historyTab === "visits" ? t.white : t.textMuted }}>
+              🚜 Pool Visits ({myVisits.length})
+            </button>
+          </div>
+
+          {loadingHistory ? (
+            <div style={{ textAlign: "center", padding: 48, color: t.textMuted }}>Loading your history...</div>
+          ) : historyTab === "orders" ? (
+            myOrders.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+                <p style={{ fontSize: 24, marginBottom: 8 }}>📦</p>
+                <p style={{ fontWeight: 600, marginBottom: 4 }}>No orders yet</p>
+                <p style={{ color: t.textMuted, fontSize: 13 }}>Orders you place on listings or pools will show up here.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {myOrders.map(o => {
+                  const col = STATUS_COLORS[o.status] || { bg: t.border, text: t.text };
+                  return (
+                    <div key={o.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 15 }}>{o.source === "pool" ? "🤝" : "🌱"} {o.title || "Avocados"}</span>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: col.bg, color: col.text, fontWeight: 500, textTransform: "capitalize" }}>{o.status}</span>
+                            <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 99, background: t.brownLight, color: t.brown }}>{o.source === "pool" ? "Pool order" : "Direct order"}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: t.textMuted }}>📍 {o.location || "—"}{o.contact?.phone && ` · 📞 ${o.contact.phone}`}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: t.greenDark }}>Ksh {(o.quantity_kg * o.price_per_kg)?.toLocaleString()}</div>
+                          <div style={{ fontSize: 11, color: t.textMuted }}>{o.quantity_kg?.toLocaleString()} kg @ Ksh {o.price_per_kg}/kg</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: t.textMuted }}>🗓 {new Date(o.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            myVisits.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+                <p style={{ fontSize: 24, marginBottom: 8 }}>🚜</p>
+                <p style={{ fontWeight: 600, marginBottom: 4 }}>No pool visits yet</p>
+                <p style={{ color: t.textMuted, fontSize: 13 }}>Field visit requests you make to constituency pools will show up here.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {myVisits.map(v => {
+                  const visitCol = { pending_visit: { bg: t.amberLight || "#FEF3C7", text: "#92400E" }, confirmed_sold: { bg: t.greenLight, text: t.greenDark }, expired: { bg: "#FEE2E2", text: "#991B1B" } };
+                  const col = visitCol[v.status] || { bg: t.border, text: t.text };
+                  return (
+                    <div key={v.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, boxShadow: t.shadow }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 15 }}>🚜 {v.constituency_pools?.constituency} Pool</span>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, background: col.bg, color: col.text, fontWeight: 500 }}>
+                              {v.status === "pending_visit" ? "Pending visit" : v.status === "confirmed_sold" ? "Confirmed sold" : "Expired"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: t.textMuted }}>📍 {v.constituency_pools?.county} · {v.constituency_pools?.variety}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: t.greenDark }}>{v.total_selected_kg?.toLocaleString()} kg</div>
+                          <div style={{ fontSize: 11, color: t.textMuted }}>target: {v.target_kg}kg</div>
+                        </div>
+                      </div>
+                      {v.status === "pending_visit" && (
+                        <div style={{ fontSize: 12, color: "#92400E", fontWeight: 500 }}>
+                          ⏱ Visit window expires {new Date(v.expires_at).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}{v.extended && " (extended)"}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: t.textMuted, marginTop: 6 }}>🗓 Requested {new Date(v.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
       )}
