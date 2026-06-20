@@ -25,6 +25,7 @@ const TABS = [
   { key: "no_shows",  label: "⚠️ No-shows",   color: t.red },
   { key: "resources", label: "🌿 Resources",   color: t.green },
   { key: "pools",     label: "🤝 Pool Orders", color: t.purple },
+  { key: "visits",    label: "🚜 Visit Requests", color: t.amber },
   { key: "stats",     label: "📊 Stats",       color: t.purple },
 ];
 
@@ -975,6 +976,228 @@ Tafadhali jiandae kuleta avocados zako. Tutawasiliana na maelezo zaidi ya mahali
   );
 }
 
+// ── Visit Requests Tab ─────────────────────────────────────────
+function VisitRequestsTab() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending_visit");
+  const [expandedRequest, setExpandedRequest] = useState(null);
+  const [visitFarmers, setVisitFarmers] = useState({});
+  const [farmersLoading, setFarmersLoading] = useState(false);
+
+  useEffect(() => { load(); setExpandedRequest(null); }, [filter]);
+
+  async function load() {
+    setLoading(true);
+    // Auto-expire any requests past their expiry before showing the list
+    await autoExpireOld();
+    const { data } = await supabase
+      .from("pool_visit_requests")
+      .select("*, constituency_pools(constituency, county, variety), profiles!pool_visit_requests_buyer_id_fkey(name, phone)")
+      .eq("status", filter)
+      .order("created_at", { ascending: false });
+    setRequests(data || []);
+    setLoading(false);
+  }
+
+  async function autoExpireOld() {
+    const { data: overdue } = await supabase
+      .from("pool_visit_requests")
+      .select("id, pool_id")
+      .eq("status", "pending_visit")
+      .lt("expires_at", new Date().toISOString());
+
+    if (!overdue || overdue.length === 0) return;
+
+    for (const req of overdue) {
+      await supabase.from("pool_visit_requests").update({ status: "expired", resolved_at: new Date().toISOString() }).eq("id", req.id);
+
+      const { data: linkedFarmers } = await supabase
+        .from("pool_visit_farmers").select("contribution_id").eq("visit_request_id", req.id);
+      const contributionIds = (linkedFarmers || []).map(f => f.contribution_id);
+      if (contributionIds.length > 0) {
+        await supabase.from("pool_contributions").update({ status: "active" }).in("id", contributionIds);
+        const { data: remaining } = await supabase
+          .from("pool_contributions").select("quantity_kg").eq("pool_id", req.pool_id).eq("status", "active");
+        const newTotal = (remaining || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
+        await supabase.from("constituency_pools").update({ total_kg: newTotal }).eq("id", req.pool_id);
+      }
+    }
+  }
+
+  async function toggleFarmers(request) {
+    if (expandedRequest === request.id) { setExpandedRequest(null); return; }
+    setExpandedRequest(request.id);
+    if (visitFarmers[request.id]) return;
+    setFarmersLoading(true);
+    const { data } = await supabase
+      .from("pool_visit_farmers")
+      .select("*, profiles!pool_visit_farmers_farmer_id_fkey(name, phone, county)")
+      .eq("visit_request_id", request.id);
+    setVisitFarmers(prev => ({ ...prev, [request.id]: data || [] }));
+    setFarmersLoading(false);
+  }
+
+  function buildVisitWhatsAppLink(farmerPhone, farmerName, request) {
+    const pool = request.constituency_pools;
+    const cleanPhone = farmerPhone.replace(/\D/g, "").replace(/^0/, "254");
+    const message =
+`Habari ${farmerName?.split(" ")[0] || ""}! 🥑
+
+Mnunuzi (buyer) anataka kuja kuangalia avocados zako za ${pool?.variety} katika pool ya ${pool?.constituency}.
+
+Buyer: ${request.profiles?.name}
+📞 Watakupigia simu kupanga siku ya kuja.
+
+Tafadhali jiandae — avocados zako zikiwa tayari na nzuri kuonyeshwa.
+
+— AvoConnect Admin`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  }
+
+  async function confirmSold(request) {
+    if (!confirm(`Confirm buyer ${request.profiles?.name} is buying ${request.total_selected_kg}kg from this visit?`)) return;
+
+    await supabase.from("pool_visit_requests").update({ status: "confirmed_sold", resolved_at: new Date().toISOString() }).eq("id", request.id);
+
+    const { data: linkedFarmers } = await supabase
+      .from("pool_visit_farmers").select("*, profiles!pool_visit_farmers_farmer_id_fkey(name, phone)").eq("visit_request_id", request.id);
+
+    const contributionIds = (linkedFarmers || []).map(f => f.contribution_id);
+    if (contributionIds.length > 0) {
+      await supabase.from("pool_contributions").update({ status: "sold", delivered: true, delivery_marked_at: new Date().toISOString() }).in("id", contributionIds);
+    }
+
+    for (const f of linkedFarmers || []) {
+      await supabase.from("notifications").insert({
+        user_id: f.farmer_id, type: "completed",
+        title: "Your avocados were sold! 🎉",
+        message: `${request.profiles?.name} confirmed buying your ${f.quantity_kg}kg from the ${request.constituency_pools?.constituency} pool. Admin will coordinate payment and pickup.`,
+      });
+    }
+
+    load();
+  }
+
+  async function cancelRequest(request) {
+    if (!confirm("Cancel this visit request and return farmers to the general pool?")) return;
+    await supabase.from("pool_visit_requests").update({ status: "expired", resolved_at: new Date().toISOString() }).eq("id", request.id);
+
+    const { data: linkedFarmers } = await supabase
+      .from("pool_visit_farmers").select("contribution_id").eq("visit_request_id", request.id);
+    const contributionIds = (linkedFarmers || []).map(f => f.contribution_id);
+    if (contributionIds.length > 0) {
+      await supabase.from("pool_contributions").update({ status: "active" }).in("id", contributionIds);
+      const { data: remaining } = await supabase
+        .from("pool_contributions").select("quantity_kg").eq("pool_id", request.pool_id).eq("status", "active");
+      const newTotal = (remaining || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
+      await supabase.from("constituency_pools").update({ total_kg: newTotal }).eq("id", request.pool_id);
+    }
+    load();
+  }
+
+  async function extendRequest(request) {
+    if (request.extended) { alert("This request has already been extended once."); return; }
+    const newExpiry = new Date(new Date(request.expires_at).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from("pool_visit_requests").update({ expires_at: newExpiry, extended: true }).eq("id", request.id);
+    load();
+  }
+
+  function timeRemaining(expiresAt) {
+    const diff = new Date(expiresAt) - new Date();
+    if (diff <= 0) return "Expired";
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return `${days}d ${hours}h left`;
+  }
+
+  const STATUS_LOOKUP = {
+    pending_visit:  { bg: t.amberLight, text: "#92400E", label: "Pending visit" },
+    confirmed_sold: { bg: t.greenLight, text: t.greenDark, label: "Confirmed sold" },
+    expired:        { bg: t.redLight,   text: t.red,       label: "Expired/returned" },
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {["pending_visit","confirmed_sold","expired"].map(s => (
+          <button key={s} onClick={() => setFilter(s)}
+            style={{ padding: "7px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer", border: "none", fontFamily: "Inter, sans-serif", fontWeight: filter === s ? 600 : 400, background: filter === s ? t.amber : t.brownLight, color: filter === s ? t.white : t.textMuted }}>
+            {STATUS_LOOKUP[s]?.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>
+      ) : requests.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🚜</div>
+          <p style={{ color: t.textMuted }}>No {STATUS_LOOKUP[filter]?.label.toLowerCase()} visit requests.</p>
+        </div>
+      ) : requests.map(r => (
+        <div key={r.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 10, boxShadow: t.shadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>🚜 {r.constituency_pools?.constituency} Pool</div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>Buyer: {r.profiles?.name} · 📞 {r.profiles?.phone}</div>
+            </div>
+            <Badge label={STATUS_LOOKUP[r.status]?.label} bg={STATUS_LOOKUP[r.status]?.bg} color={STATUS_LOOKUP[r.status]?.text} />
+          </div>
+
+          <div style={{ background: t.cream, borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 13 }}>
+            Target: {r.target_kg}kg · Selected: {r.total_selected_kg}kg · {r.constituency_pools?.variety}
+            {r.status === "pending_visit" && (
+              <div style={{ marginTop: 6, fontWeight: 600, color: timeRemaining(r.expires_at) === "Expired" ? t.red : t.amberDark || "#92400E" }}>
+                ⏱ {timeRemaining(r.expires_at)} {r.extended && "(extended once)"}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button onClick={() => toggleFarmers(r)} style={{ ...btn("none", t.purple, `1px solid ${t.purple}`), flex: 1 }}>
+              {expandedRequest === r.id ? "▲ Hide farmers" : "📲 View & notify farmers"}
+            </button>
+          </div>
+
+          {expandedRequest === r.id && (
+            <div style={{ background: t.cream, borderRadius: 10, padding: 12, border: `1px solid ${t.border}`, marginBottom: 10 }}>
+              {farmersLoading && !visitFarmers[r.id] ? (
+                <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>Loading farmers…</p>
+              ) : (visitFarmers[r.id] || []).length === 0 ? (
+                <p style={{ fontSize: 12, color: t.textMuted, textAlign: "center", padding: 10 }}>No farmers linked to this request.</p>
+              ) : (visitFarmers[r.id] || []).map(f => (
+                <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: t.white, borderRadius: 8, padding: "8px 10px", marginBottom: 6, border: `1px solid ${t.border}` }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 12 }}>{f.profiles?.name || "Unknown farmer"}</div>
+                    <div style={{ fontSize: 11, color: t.textMuted }}>📞 {f.profiles?.phone} · {f.quantity_kg}kg · 📍 {f.profiles?.county}</div>
+                  </div>
+                  {f.profiles?.phone && r.status === "pending_visit" && (
+                    <a href={buildVisitWhatsAppLink(f.profiles.phone, f.profiles.name, r)} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
+                      💬
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {r.status === "pending_visit" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => cancelRequest(r)} style={{ ...btn("none", t.red, "1px solid #FCA5A5"), flex: 1 }}>Cancel & return</button>
+              {!r.extended && (
+                <button onClick={() => extendRequest(r)} style={{ ...btn("none", t.amber, "1px solid #FCD34D"), flex: 1 }}>+3 days</button>
+              )}
+              <button onClick={() => confirmSold(r)} style={{ ...btn(t.green, t.white), flex: 2 }}>✅ Confirm sold</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main AdminPage ─────────────────────────────────────────────
 export default function AdminPage({ profile }) {
   const [tab, setTab] = useState("pending");
@@ -1029,6 +1252,7 @@ export default function AdminPage({ profile }) {
       {tab === "no_shows"  && <NoShowsTab />}
       {tab === "resources" && <ResourcesTab />}
       {tab === "pools"     && <PoolOrdersTab />}
+      {tab === "visits"    && <VisitRequestsTab />}
       {tab === "stats"     && <StatsTab />}
     </div>
   );
