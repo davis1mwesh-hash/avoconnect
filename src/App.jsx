@@ -703,23 +703,17 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
             <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., David Kariuki" style={inp} /></div>
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Phone Number</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g., 0712345678" style={inp} /></div>
-         <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Set 4-Digit PIN</label>
-  <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g., 1234" style={inp} /></div>
-<div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Confirm PIN</label>
-  <input type="password" maxLength={4} value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Re-enter PIN" style={inp} /></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County Base</label>
-              <select value={county} onChange={e => setCounty(e.target.value)} style={inp}>
-                {COUNTIES.map(c => <option key={c}>{c}</option>)}
-              </select></div>
-            <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Platform Role</label>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Platform Role</label>
               <select value={role} onChange={e => setRole(e.target.value)} style={inp}>
                 <option value="farmer">🌱 Farmer</option>
                 <option value="cooperative">🤝 Cooperative</option>
                 <option value="buyer">🏪 Local Buyer / Exporter</option>
                 <option value="company">🏢 Input / Product Supplier</option>
               </select></div>
-          </div>
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>County Base</label>
+              <select value={county} onChange={e => setCounty(e.target.value)} style={inp}>
+                {COUNTIES.map(c => <option key={c}>{c}</option>)}
+              </select></div>
           {role === "farmer" && (
             <div>
               <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Constituency *</label>
@@ -751,6 +745,10 @@ if (role === "cooperative" && (!regNumber || !kraPin)) { setError("Cooperatives 
               </div>
             </>
           )}
+          <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Set 4-Digit PIN</label>
+  <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g., 1234" style={inp} /></div>
+<div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Confirm PIN</label>
+  <input type="password" maxLength={4} value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Re-enter PIN" style={inp} /></div>
           {error && <p style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ ...btn(t.green, t.white), marginTop: 8 }}>
             {loading ? "Registering account…" : "Open account"}
