@@ -1016,12 +1016,54 @@ function VisitRequestsTab() {
         .from("pool_visit_farmers").select("contribution_id").eq("visit_request_id", req.id);
       const contributionIds = (linkedFarmers || []).map(f => f.contribution_id);
       if (contributionIds.length > 0) {
-        await supabase.from("pool_contributions").update({ status: "active" }).in("id", contributionIds);
+        for (const id of contributionIds) {
+          await returnContributionToPool(id);
+        }
         const { data: remaining } = await supabase
           .from("pool_contributions").select("quantity_kg").eq("pool_id", req.pool_id).eq("status", "active");
         const newTotal = (remaining || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
         await supabase.from("constituency_pools").update({ total_kg: newTotal }).eq("id", req.pool_id);
       }
+    }
+  }
+
+  // When un-reserving a (possibly split) contribution, merge it back with any
+// existing active contribution from the same farmer/pool that matches exactly
+// on variety, grade, and price — so splits don't fragment the pool forever.
+async function returnContributionToPool(contributionId) {
+    const { data: contrib, error: fetchErr } = await supabase
+      .from("pool_contributions")
+      .select("id, pool_id, farmer_id, quantity_kg, variety, quality_grade, price_per_kg, harvest_date")
+      .eq("id", contributionId)
+      .single();
+    if (fetchErr || !contrib) {
+      console.error("Could not fetch contribution to return:", fetchErr?.message);
+      return;
+    }
+
+    // Look for an existing active match from the same farmer in the same pool
+    const { data: match } = await supabase
+      .from("pool_contributions")
+      .select("id, quantity_kg")
+      .eq("pool_id", contrib.pool_id)
+      .eq("farmer_id", contrib.farmer_id)
+      .eq("status", "active")
+      .eq("variety", contrib.variety)
+      .eq("quality_grade", contrib.quality_grade)
+      .eq("price_per_kg", contrib.price_per_kg)
+      .neq("id", contrib.id)
+      .maybeSingle();
+
+    if (match) {
+      // Merge: add this contribution's kg onto the matching active row, delete this one
+      await supabase
+        .from("pool_contributions")
+        .update({ quantity_kg: match.quantity_kg + contrib.quantity_kg })
+        .eq("id", match.id);
+      await supabase.from("pool_contributions").delete().eq("id", contrib.id);
+    } else {
+      // No match found — just reactivate this row as-is
+      await supabase.from("pool_contributions").update({ status: "active" }).eq("id", contrib.id);
     }
   }
 
@@ -1102,7 +1144,9 @@ Tafadhali jiandae — avocados zako zikiwa tayari na nzuri kuonyeshwa.
       .from("pool_visit_farmers").select("contribution_id").eq("visit_request_id", request.id);
     const contributionIds = (linkedFarmers || []).map(f => f.contribution_id);
     if (contributionIds.length > 0) {
-      await supabase.from("pool_contributions").update({ status: "active" }).in("id", contributionIds);
+      for (const id of contributionIds) {
+        await returnContributionToPool(id);
+      }
       const { data: remaining } = await supabase
         .from("pool_contributions").select("quantity_kg").eq("pool_id", request.pool_id).eq("status", "active");
       const newTotal = (remaining || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
