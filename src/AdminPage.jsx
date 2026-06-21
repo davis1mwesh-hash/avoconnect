@@ -1038,6 +1038,21 @@ function VisitRequestsTab() {
     setFarmersLoading(false);
   }
 
+  async function notifyFarmerInApp(visitFarmer, request) {
+    const pool = request.constituency_pools;
+    await supabase.from("notifications").insert({
+      user_id: visitFarmer.farmer_id,
+      type: "order",
+      title: "Buyer interested in your avocados 🚜",
+      message: `A buyer (${request.profiles?.name || "verified buyer"}) wants to visit and inspect your ${visitFarmer.quantity_kg}kg in the ${pool?.constituency} pool. Admin will contact you on WhatsApp with the visit date.`,
+    });
+    await supabase.from("pool_visit_farmers").update({ notified: true }).eq("id", visitFarmer.id);
+    setVisitFarmers(prev => ({
+      ...prev,
+      [request.id]: (prev[request.id] || []).map(f => f.id === visitFarmer.id ? { ...f, notified: true } : f)
+    }));
+  }
+
   function buildVisitWhatsAppLink(farmerPhone, farmerName, request) {
     const pool = request.constituency_pools;
     const cleanPhone = farmerPhone.replace(/\D/g, "").replace(/^0/, "254");
@@ -1172,11 +1187,26 @@ Tafadhali jiandae — avocados zako zikiwa tayari na nzuri kuonyeshwa.
                     <div style={{ fontWeight: 600, fontSize: 12 }}>{f.profiles?.name || "Unknown farmer"}</div>
                     <div style={{ fontSize: 11, color: t.textMuted }}>📞 {f.profiles?.phone} · {f.quantity_kg}kg · 📍 {f.profiles?.county}</div>
                   </div>
-                  {f.profiles?.phone && r.status === "pending_visit" && (
-                    <a href={buildVisitWhatsAppLink(f.profiles.phone, f.profiles.name, r)} target="_blank" rel="noopener noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
-                      💬
-                    </a>
+                  {r.status === "pending_visit" && (
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => notifyFarmerInApp(f, r)} disabled={f.notified}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          background: f.notified ? "#D1FAE5" : t.purpleLight,
+                          color: f.notified ? t.greenDark : t.purple,
+                          border: "none", padding: "6px 10px", borderRadius: 8,
+                          fontSize: 11, fontWeight: 600, cursor: f.notified ? "default" : "pointer",
+                          fontFamily: "Inter, sans-serif",
+                        }}>
+                        {f.notified ? "✓ Notified" : "🔔 Notify in-app"}
+                      </button>
+                      {f.profiles?.phone && (
+                        <a href={buildVisitWhatsAppLink(f.profiles.phone, f.profiles.name, r)} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                          💬
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

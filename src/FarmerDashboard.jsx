@@ -48,7 +48,8 @@ export default function FarmerDashboard({ setPage, profile }) {
     loadAll();
     fetchBuyerDemands();
     fetchMyPitches();
-    const interval = setInterval(() => { loadAll(); fetchMyPitches(); }, 10000);
+    fetchMyPoolContributions();
+    const interval = setInterval(() => { loadAll(); fetchMyPitches(); fetchMyPoolContributions(); }, 10000);
     return () => clearInterval(interval);
   }, []);
 
