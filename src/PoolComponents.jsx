@@ -53,6 +53,7 @@ export function PoolCard({ pool, contributorCount, onClick }) {
 }
 
 // ── Auto-select algorithm: closest match to target kg, fewest farmers ──────────
+// Splits the LAST contribution if it would leave more than half of it unused.
 function autoSelectFarmers(contributions, targetKg) {
   const sorted = [...contributions].sort((a, b) => b.quantity_kg - a.quantity_kg);
   const selected = [];
@@ -60,16 +61,38 @@ function autoSelectFarmers(contributions, targetKg) {
 
   for (const c of sorted) {
     if (runningTotal >= targetKg) break;
-    selected.push(c);
+    selected.push({ ...c, reserveKg: c.quantity_kg, split: false });
     runningTotal += c.quantity_kg;
   }
 
+  if (selected.length === 0) return { selected: [], totalKg: 0 };
+
+  // Try dropping the last (smallest) pick if the rest already covers target
   if (selected.length > 1) {
     const withoutLast = runningTotal - selected[selected.length - 1].quantity_kg;
     if (withoutLast >= targetKg) {
       selected.pop();
       runningTotal = withoutLast;
     }
+  }
+
+  // Check the last selected contribution for splitting: if reserving the WHOLE
+  // thing leaves more than half of it unused relative to what's actually needed
+  // from it, split — reserve only what's needed, leave the rest active.
+  const last = selected[selected.length - 1];
+  const totalBeforeLast = runningTotal - last.quantity_kg;
+  const neededFromLast = targetKg - totalBeforeLast;
+
+  if (neededFromLast > 0 && neededFromLast < last.quantity_kg) {
+    const leftover = last.quantity_kg - neededFromLast;
+    if (leftover > last.quantity_kg / 2) {
+      // Split: reserve only what's needed, the rest stays active in the pool
+      last.reserveKg = neededFromLast;
+      last.split = true;
+      last.leftoverKg = leftover;
+      runningTotal = totalBeforeLast + neededFromLast;
+    }
+    // else: leftover is half or less — keep the whole contribution as-is (no split)
   }
 
   return { selected, totalKg: runningTotal };
@@ -131,22 +154,62 @@ export function PoolDetail({ pool, contributorCount, setPage, profile }) {
 
     if (vrErr) { setError("Failed to create visit request: " + vrErr.message); setLoading(false); return; }
 
-    // Step 2: link selected farmers to this visit request
-    const visitFarmerRows = suggested.map(c => ({
+    // Step 2: handle any split contribution first — shrink original to leftover,
+    // insert a new row for the reserved portion. Build the final contribution
+    // list (with correct IDs) used for linking + reserving.
+    const finalContributions = [];
+    for (const c of suggested) {
+      if (c.split) {
+        // Shrink the original row to just the leftover, keep it active in the pool
+        const { error: shrinkErr } = await supabase
+          .from("pool_contributions")
+          .update({ quantity_kg: c.leftoverKg })
+          .eq("id", c.id);
+        if (shrinkErr) {
+          await supabase.from("pool_visit_requests").delete().eq("id", visitRequest.id);
+          setError("Failed to split farmer contribution: " + shrinkErr.message);
+          setLoading(false);
+          return;
+        }
+
+        // Insert a new row for the reserved portion
+        const { data: newRow, error: insertErr } = await supabase
+          .from("pool_contributions")
+          .insert({
+            pool_id: c.pool_id, farmer_id: c.farmer_id, quantity_kg: c.reserveKg,
+            variety: c.variety, price_per_kg: c.price_per_kg, harvest_date: c.harvest_date,
+            quality_grade: c.quality_grade, status: "active",
+          })
+          .select().single();
+        if (insertErr) {
+          // Roll back the shrink so we don't lose kg
+          await supabase.from("pool_contributions").update({ quantity_kg: c.quantity_kg }).eq("id", c.id);
+          await supabase.from("pool_visit_requests").delete().eq("id", visitRequest.id);
+          setError("Failed to create split contribution: " + insertErr.message);
+          setLoading(false);
+          return;
+        }
+        finalContributions.push({ ...newRow, farmer_id: c.farmer_id });
+      } else {
+        finalContributions.push(c);
+      }
+    }
+
+    // Step 3: link selected (now-final) contributions to this visit request
+    const visitFarmerRows = finalContributions.map(c => ({
       visit_request_id: visitRequest.id, contribution_id: c.id,
-      farmer_id: c.farmer_id, quantity_kg: c.quantity_kg,
+      farmer_id: c.farmer_id, quantity_kg: c.reserveKg || c.quantity_kg,
     }));
     const { error: vfErr } = await supabase.from("pool_visit_farmers").insert(visitFarmerRows);
     if (vfErr) {
-      // Roll back the visit request so we don't leave an orphaned record
       await supabase.from("pool_visit_requests").delete().eq("id", visitRequest.id);
       setError("Failed to link farmers to visit: " + vfErr.message);
       setLoading(false);
       return;
     }
 
-    // Step 3: mark those contributions as reserved (pulled from general pool)
-    const contributionIds = suggested.map(c => c.id);
+    // Step 4: mark those (final) contributions as reserved (pulled from general pool)
+    const contributionIds = finalContributions.map(c => c.id);
     const { error: statusErr } = await supabase
       .from("pool_contributions").update({ status: "reserved" }).in("id", contributionIds);
     if (statusErr) {
@@ -265,7 +328,7 @@ export function PoolDetail({ pool, contributorCount, setPage, profile }) {
                             <div style={{ fontSize: 11, color: t.textMuted }}>📍 {c.profiles?.county}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{c.quantity_kg}kg</div>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{c.reserveKg || c.quantity_kg}kg{c.split && <span style={{ fontSize: 10, color: t.purple, fontWeight: 500 }}> (of {c.quantity_kg}kg)</span>}</div>
                             <span style={{ fontSize: 10, padding: "1px 8px", borderRadius: 99, background: gc.bg, color: gc.text, fontWeight: 600 }}>Grade {c.quality_grade || "A"}</span>
                           </div>
                         </div>
