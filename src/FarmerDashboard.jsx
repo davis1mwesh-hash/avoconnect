@@ -92,11 +92,27 @@ export default function FarmerDashboard({ setPage, profile }) {
       const reservedIds = (data || []).filter(c => c.status === "reserved").map(c => c.id);
       let visitMap = {};
       if (reservedIds.length > 0) {
-        const { data: visitLinks } = await supabase
+        const { data: visitLinks, error: visitLinkErr } = await supabase
           .from("pool_visit_farmers")
-          .select("contribution_id, pool_visit_requests(expires_at, status)")
+          .select("contribution_id, visit_request_id")
           .in("contribution_id", reservedIds);
-        (visitLinks || []).forEach(v => { visitMap[v.contribution_id] = v.pool_visit_requests; });
+
+        if (visitLinkErr) console.error("Visit link fetch error:", visitLinkErr.message);
+
+        const requestIds = [...new Set((visitLinks || []).map(v => v.visit_request_id))];
+        let requestMap = {};
+        if (requestIds.length > 0) {
+          const { data: requestRows, error: requestErr } = await supabase
+            .from("pool_visit_requests")
+            .select("id, expires_at, status, extended")
+            .in("id", requestIds);
+          if (requestErr) console.error("Visit request fetch error:", requestErr.message);
+          (requestRows || []).forEach(r => { requestMap[r.id] = r; });
+        }
+
+        (visitLinks || []).forEach(v => {
+          visitMap[v.contribution_id] = requestMap[v.visit_request_id] || null;
+        });
       }
 
       setMyPoolContributions((data || []).map(c => ({ ...c, visitInfo: visitMap[c.id] || null })));
