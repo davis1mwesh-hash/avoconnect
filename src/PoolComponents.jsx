@@ -119,6 +119,7 @@ export function PoolDetail({ pool, contributorCount, setPage, profile }) {
 
     const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
+    // Step 1: create the visit request
     const { data: visitRequest, error: vrErr } = await supabase
       .from("pool_visit_requests")
       .insert({
@@ -130,27 +131,62 @@ export function PoolDetail({ pool, contributorCount, setPage, profile }) {
 
     if (vrErr) { setError("Failed to create visit request: " + vrErr.message); setLoading(false); return; }
 
+    // Step 2: link selected farmers to this visit request
     const visitFarmerRows = suggested.map(c => ({
       visit_request_id: visitRequest.id, contribution_id: c.id,
       farmer_id: c.farmer_id, quantity_kg: c.quantity_kg,
     }));
-    await supabase.from("pool_visit_farmers").insert(visitFarmerRows);
+    const { error: vfErr } = await supabase.from("pool_visit_farmers").insert(visitFarmerRows);
+    if (vfErr) {
+      // Roll back the visit request so we don't leave an orphaned record
+      await supabase.from("pool_visit_requests").delete().eq("id", visitRequest.id);
+      setError("Failed to link farmers to visit: " + vfErr.message);
+      setLoading(false);
+      return;
+    }
 
+    // Step 3: mark those contributions as reserved (pulled from general pool)
     const contributionIds = suggested.map(c => c.id);
-    await supabase.from("pool_contributions").update({ status: "reserved" }).in("id", contributionIds);
+    const { error: statusErr } = await supabase
+      .from("pool_contributions").update({ status: "reserved" }).in("id", contributionIds);
+    if (statusErr) {
+      await supabase.from("pool_visit_farmers").delete().eq("visit_request_id", visitRequest.id);
+      await supabase.from("pool_visit_requests").delete().eq("id", visitRequest.id);
+      setError("Failed to reserve farmers: " + statusErr.message + ". Your request was not submitted — please try again or contact admin.");
+      setLoading(false);
+      return;
+    }
 
-    const { data: remaining } = await supabase
+    // Step 4: recalculate the pool's visible total (only counts still-active contributions)
+    const { data: remaining, error: remainingErr } = await supabase
       .from("pool_contributions").select("quantity_kg").eq("pool_id", pool.id).eq("status", "active");
+    if (remainingErr) {
+      setError("Visit request saved, but pool total could not be updated. Contact admin to verify.");
+      setLoading(false);
+      setRequested(true);
+      return;
+    }
     const newTotal = (remaining || []).reduce((s, c) => s + (c.quantity_kg || 0), 0);
-    await supabase.from("constituency_pools").update({ total_kg: newTotal }).eq("id", pool.id);
+    const { error: poolUpdateErr } = await supabase
+      .from("constituency_pools").update({ total_kg: newTotal }).eq("id", pool.id);
+    if (poolUpdateErr) {
+      setError("Visit request saved, but pool total could not be updated. Contact admin to verify.");
+      setLoading(false);
+      setRequested(true);
+      return;
+    }
 
+    // Step 5: notify admin (non-blocking — if this fails, the visit request still stands)
     const { data: admin } = await supabase.from("profiles").select("id").eq("phone", "0710701013").maybeSingle();
     if (admin) {
-      await supabase.from("notifications").insert({
+      const { error: notifErr } = await supabase.from("notifications").insert({
         user_id: admin.id, type: "order",
         title: "New pool visit request 🚜",
         message: `${profile.name} wants to visit ${suggested.length} farmer(s) in ${pool.constituency} pool for ${suggestedTotal}kg. Notify farmers and coordinate the visit.`,
       });
+      if (notifErr) console.error("Admin notification failed:", notifErr.message);
+    } else {
+      console.error("Admin profile not found for notification — check the hardcoded phone number.");
     }
 
     setLoading(false);
