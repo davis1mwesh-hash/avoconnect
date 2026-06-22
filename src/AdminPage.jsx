@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./App";
+import ConstituencyPicker from "./ConstituencyPicker";
 
 const t = {
   green: "#2D7A4F", greenDark: "#1A5C35", greenLight: "#EAF4EE",
@@ -27,6 +28,7 @@ const TABS = [
   { key: "pools",     label: "🤝 Pool Orders", color: t.purple },
   { key: "visits",    label: "🚜 Visit Requests", color: t.amber },
   { key: "stats",     label: "📊 Stats",       color: t.purple },
+  { key: "subadmins", label: "👤 Sub-Admins",  color: t.greenDark },
 ];
 
 function StatCard({ icon, label, value, color, onClick }) {
@@ -1272,6 +1274,119 @@ Tafadhali jiandae — avocados zako zikiwa tayari na nzuri kuonyeshwa.
   );
 }
 
+// ── Sub-Admins Tab ────────────────────────────────────────────
+function SubAdminsTab() {
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [constituency, setConstituency] = useState("");
+  const [county, setCounty] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "admin")
+      .eq("admin_role", "constituency")
+      .order("created_at", { ascending: false });
+    setAdmins(data || []);
+    setLoading(false);
+  }
+
+  async function createSubAdmin(e) {
+    e.preventDefault();
+    if (!name || !phone || !pin || !constituency) { setError("Fill in all fields and select a constituency."); return; }
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setError("PIN must be exactly 4 digits."); return; }
+    setSaving(true); setError("");
+    const { data: exists } = await supabase.from("profiles").select("id").eq("phone", phone).maybeSingle();
+    if (exists) { setError("An account with this phone number already exists."); setSaving(false); return; }
+    const { data, error: err } = await supabase.from("profiles").insert({
+      name, phone, pin, role: "admin", admin_role: "constituency",
+      assigned_constituency: constituency, county: county || "Nakuru", verified: true,
+    }).select().single();
+    setSaving(false);
+    if (err) { setError("Failed to create sub-admin: " + err.message); return; }
+    setAdmins(prev => [data, ...prev]);
+    setName(""); setPhone(""); setPin(""); setConstituency(""); setCounty(""); setShowForm(false);
+  }
+
+  async function toggleSuspend(admin) {
+    const newVal = !admin.suspended;
+    await supabase.from("profiles").update({ suspended: newVal }).eq("id", admin.id);
+    setAdmins(prev => prev.map(a => a.id === admin.id ? { ...a, suspended: newVal } : a));
+  }
+
+  if (loading) return <p style={{ textAlign: "center", color: t.textMuted, padding: 40 }}>Loading…</p>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: t.textMuted }}>{admins.length} constituency admin{admins.length !== 1 ? "s" : ""}</p>
+        <button onClick={() => setShowForm(!showForm)} style={btn(t.green, t.white)}>
+          {showForm ? "← View admins" : "+ Add Sub-Admin"}
+        </button>
+      </div>
+
+      {showForm ? (
+        <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 18, padding: 24, boxShadow: t.shadow, maxWidth: 500 }}>
+          <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 20, marginBottom: 20 }}>Create Constituency Admin</h3>
+          {error && <p style={{ fontSize: 13, color: t.red, padding: 10, background: t.redLight, borderRadius: 8, marginBottom: 12 }}>{error}</p>}
+          <form onSubmit={createSubAdmin}>
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Full Name *</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. JANE WANJIRU"
+              style={{ width: "100%", padding: "11px 14px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 14, marginBottom: 12, fontFamily: "Inter, sans-serif" }} />
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Phone Number *</label>
+            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 0712345678"
+              style={{ width: "100%", padding: "11px 14px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 14, marginBottom: 12, fontFamily: "Inter, sans-serif" }} />
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>4-Digit PIN *</label>
+            <input type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)} placeholder="e.g. 1234"
+              style={{ width: "100%", padding: "11px 14px", border: `1.5px solid ${t.border}`, borderRadius: 10, fontSize: 14, marginBottom: 12, fontFamily: "Inter, sans-serif" }} />
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Assigned Constituency *</label>
+            <div style={{ marginBottom: 12 }}>
+              <ConstituencyPicker value={constituency} county={county} onChange={(cName, cCounty) => { setConstituency(cName); if (cCounty) setCounty(cCounty); }} />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button type="button" onClick={() => setShowForm(false)} style={{ ...btn("none", t.textMuted, `1px solid ${t.border}`), flex: 1 }}>Cancel</button>
+              <button type="submit" disabled={saving} style={{ ...btn(t.green, t.white), flex: 2, opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Creating…" : "Create Sub-Admin"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : admins.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
+          <p style={{ color: t.textMuted, marginBottom: 16 }}>No constituency admins yet.</p>
+          <button onClick={() => setShowForm(true)} style={{ ...btn(t.green, t.white), padding: "10px 24px" }}>Add first sub-admin</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {admins.map(a => (
+            <div key={a.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: t.shadow, opacity: a.suspended ? 0.6 : 1 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{a.name}</div>
+                <div style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>📞 {a.phone} · 📍 {a.assigned_constituency}</div>
+                {a.suspended && <Badge label="Suspended" bg={t.redLight} color={t.red} />}
+              </div>
+              <button onClick={() => toggleSuspend(a)} style={{ ...btn("none", a.suspended ? t.green : t.red, `1px solid ${a.suspended ? t.green : "#FCA5A5"}`), padding: "6px 12px", fontSize: 12 }}>
+                {a.suspended ? "Reactivate" : "Deactivate"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main AdminPage ─────────────────────────────────────────────
 export default function AdminPage({ profile }) {
   const [tab, setTab] = useState("pending");
@@ -1328,6 +1443,7 @@ export default function AdminPage({ profile }) {
       {tab === "pools"     && <PoolOrdersTab />}
       {tab === "visits"    && <VisitRequestsTab />}
       {tab === "stats"     && <StatsTab />}
+      {tab === "subadmins" && <SubAdminsTab />}
     </div>
   );
 }

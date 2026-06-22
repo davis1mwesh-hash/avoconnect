@@ -11,6 +11,8 @@ import { PoolCard, PoolDetail } from "./PoolComponents";
 import LinkListingModal from "./LinkListingModal"; 
 import FarmerDashboard from "./FarmerDashboard";
 import BuyerDashboard from "./BuyerDashboard";
+import AdminLogin from "./AdminLogin";
+import ConstituencyAdminDashboard from "./ConstituencyAdminDashboard";
 
 // THIS IS THE ONLY GENERATOR IN THE PROJECT
 export const supabase = createClient(
@@ -219,6 +221,34 @@ function Nav({ setPage, profile, onSignOut }) {
     setMenuOpen(false);
   }
 
+  if (profile?.role === "admin") {
+    return (
+      <nav style={{
+        background: t.white, borderBottom: `1px solid ${t.border}`,
+        height: 62, position: "sticky", top: 0, zIndex: 100,
+        boxShadow: t.shadow, display: "flex", alignItems: "center",
+        justifyContent: "space-between", padding: "0 20px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${t.green}, ${t.greenDark})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 18 }}>🥑</span>
+          </div>
+          <span className="serif" style={{ fontSize: 20, color: t.text }}>AvoConnect</span>
+          <span style={{ fontSize: 11, background: t.brownLight, color: t.brown, padding: "3px 10px", borderRadius: 99, fontWeight: 600 }}>
+            {profile.admin_role === "super" ? "Super Admin" : "Constituency Admin"}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ fontSize: 13, color: t.textMuted }}>{profile.name}</span>
+          <button onClick={onSignOut}
+            style={{ ...btn(t.brownLight, t.brown), padding: "8px 16px", fontSize: 13 }}>
+            Sign out
+          </button>
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <>
       <nav style={{
@@ -343,13 +373,6 @@ function Nav({ setPage, profile, onSignOut }) {
             <>
               <SidebarSection label="AGRICULTURAL SUPPLIER" />
               <MenuItem icon="🧪" label="Supplier Dashboard" onClick={() => go("company-dashboard")} />
-            </>
-          )}
-
-          {profile?.phone === "0710701013" && (
-            <>
-              <SidebarSection label="ADMIN" />
-              <MenuItem icon="⚙️" label="Admin Panel" onClick={() => go("admin")} />
             </>
           )}
 
@@ -827,6 +850,7 @@ function Login({ setPage, setProfile }) {
     if (err || !data) { setError("No active profile found matching that number."); return; }
     if (!data.pin) { setPage({ name: "set-pin", data }); return; }
 if (data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
+    if (data.role === "admin") { setError("Admin accounts must use the admin login."); return; }
     setProfile(data);
     if (data.role === "company") setPage("company-dashboard");
     else if (data.role === "cooperative") setPage("coop-dashboard");
@@ -852,10 +876,10 @@ if (data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
         <p style={{ fontSize: 13, color: t.textMuted, marginTop: 20, textAlign: "center" }}>
           New to AvoConnect? <button onClick={() => setPage("signup")} style={{ background: "none", border: "none", color: t.green, fontWeight: 600, fontSize: 13 }}>Join free</button>
         </p>
-        <div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
+       <div style={{ marginTop: 12, padding: "12px 16px", background: "#E7F9EE", borderRadius: 10, textAlign: "center" }}>
           <p style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>Forgot your PIN?</p>
           
-          <a
+          
           href="https://wa.me/254710701013?text=Hi%20AvoConnect%20Support%2C%20I%20need%20help%20resetting%20my%20PIN.%20My%20phone%20number%20is%3A%20"
             target="_blank"
             rel="noopener noreferrer"
@@ -864,6 +888,10 @@ if (data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
             <span>💬</span> Contact Support on WhatsApp
           </a>
         </div>
+        <p style={{ textAlign: "center", fontSize: 10, color: t.border, marginTop: 20, cursor: "pointer" }}
+           onClick={() => setPage("admin-login")}>
+          ●
+        </p>
       </div>
     </div>
   );
@@ -1012,13 +1040,15 @@ export default function App() {
         {pageName === "home" && <Home setPage={setPage} />}
         {pageName === "signup" && <Signup setPage={setPage} setProfile={setProfile} />}
         {pageName === "login" && <Login setPage={setPage} setProfile={setProfile} />}
+        {pageName === "admin-login" && <AdminLogin setPage={setPage} setProfile={setProfile} />}
         {pageName === "set-pin" && pageData && <SetPin userData={pageData} setPage={setPage} setProfile={setProfile} />}
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "listing" && pageData && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
         {pageName === "dashboard" && profile && <FarmerDashboard setPage={setPage} profile={profile} />}
         {pageName === "diary" && profile?.role === "farmer" && <FarmDiary profile={profile} setPage={setPage} />}
         {pageName === "coop-dashboard" && profile?.role === "cooperative" && <CoopDashboard profile={profile} setPage={setPage} />}
-        {pageName === "admin" && profile?.phone === "0710701013" && <AdminPage profile={profile} />}
+        {pageName === "admin" && profile?.role === "admin" && profile?.admin_role === "super" && <AdminPage profile={profile} />}
+        {pageName === "constituency-dashboard" && profile?.role === "admin" && profile?.admin_role === "constituency" && <ConstituencyAdminDashboard profile={profile} />}
         {pageName === "resources" && <Resources setPage={setPage} profile={profile} />}
         {pageName === "company-dashboard" && profile?.role === "company" && <CompanyDashboard profile={profile} setPage={setPage} />}
         {pageName === "buyer-dashboard" && profile?.role === "buyer" && (
