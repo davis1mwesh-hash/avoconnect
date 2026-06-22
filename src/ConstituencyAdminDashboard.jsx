@@ -464,11 +464,11 @@ export default function ConstituencyAdminDashboard({ profile }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", borderBottom: `1px solid ${t.border}`, marginBottom: 24, overflowX: "auto" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, borderBottom: `1px solid ${t.border}`, marginBottom: 24 }}>
         {TABS.map(tb => (
           <button key={tb.key} onClick={() => setTab(tb.key)}
             style={{
-              padding: "11px 20px", fontSize: 14, background: "none", border: "none", cursor: "pointer",
+              padding: "9px 14px", fontSize: 13, background: "none", border: "none", cursor: "pointer",
               fontFamily: "Inter, sans-serif", whiteSpace: "nowrap",
               borderBottom: `2px solid ${tab === tb.key ? tb.color : "transparent"}`,
               color: tab === tb.key ? tb.color : t.textMuted,
