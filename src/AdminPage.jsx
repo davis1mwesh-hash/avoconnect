@@ -1311,6 +1311,7 @@ function SubAdminsTab() {
     const { data, error: err } = await supabase.from("profiles").insert({
       name, phone, pin, role: "admin", admin_role: "constituency",
       assigned_constituency: constituency, county: county || "Nakuru", verified: true,
+      must_reset_pin: true,
     }).select().single();
     setSaving(false);
     if (err) { setError("Failed to create sub-admin: " + err.message); return; }

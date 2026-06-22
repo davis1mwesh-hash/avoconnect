@@ -11,7 +11,7 @@ import { PoolCard, PoolDetail } from "./PoolComponents";
 import LinkListingModal from "./LinkListingModal"; 
 import FarmerDashboard from "./FarmerDashboard";
 import BuyerDashboard from "./BuyerDashboard";
-import AdminLogin from "./AdminLogin";
+import AdminLogin, { AdminSetPin } from "./AdminLogin";
 import ConstituencyAdminDashboard from "./ConstituencyAdminDashboard";
 
 // THIS IS THE ONLY GENERATOR IN THE PROJECT
@@ -1040,6 +1040,7 @@ export default function App() {
         {pageName === "signup" && <Signup setPage={setPage} setProfile={setProfile} />}
         {pageName === "login" && <Login setPage={setPage} setProfile={setProfile} />}
         {pageName === "admin-login" && <AdminLogin setPage={setPage} setProfile={setProfile} />}
+        {pageName === "admin-set-pin" && pageData && <AdminSetPin userData={pageData} setPage={setPage} setProfile={setProfile} />}
         {pageName === "set-pin" && pageData && <SetPin userData={pageData} setPage={setPage} setProfile={setProfile} />}
         {pageName === "list" && profile && <ListForm setPage={setPage} profile={profile} />}
         {pageName === "listing" && pageData && <ListingDetail listing={pageData} setPage={setPage} profile={profile} />}
