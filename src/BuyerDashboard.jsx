@@ -12,6 +12,14 @@ const [loadingReqs, setLoadingReqs] = useState(false);
 const [myOrders, setMyOrders] = useState([]);
 const [myVisits, setMyVisits] = useState([]);
 const [loadingHistory, setLoadingHistory] = useState(false);
+const [matchForm, setMatchForm] = useState({
+  variety: "Hass", county: "", constituency: "",
+  quantity: "", maxPrice: "", minGrade: "A",
+  certification: "Any",
+});
+const [matchResults, setMatchResults] = useState(null);
+const [loadingMatch, setLoadingMatch] = useState(false);
+const [matchError, setMatchError] = useState("");
   const [formData, setFormData] = useState({
     variety: "Hass", location: "", price: "", volume: "", notes: ""
   });
@@ -119,6 +127,216 @@ async function closeRequirement(id) {
     }
   }
 
+  async function runSmartMatch() {
+  if (!matchForm.quantity || Number(matchForm.quantity) <= 0) { setMatchError("Please enter how many kg you need."); return; }
+  setLoadingMatch(true); setMatchError(""); setMatchResults(null);
+
+  const qty = Number(matchForm.quantity);
+  const maxP = matchForm.maxPrice ? Number(matchForm.maxPrice) : null;
+  const gradeOrder = { A: 3, B: 2, C: 1 };
+  const minGradeScore = gradeOrder[matchForm.minGrade] || 1;
+
+  try {
+    // ── Source 1: Individual listings ──────────────────────────────────────────
+    let listingQuery = supabase
+      .from("listings")
+      .select("*, profiles!inner(name, county, verified, suspended)")
+      .eq("is_active", true)
+      .eq("variety", matchForm.variety)
+      .eq("profiles.verified", true)
+      .eq("profiles.suspended", false);
+    if (matchForm.county) listingQuery = listingQuery.ilike("county", `%${matchForm.county}%`);
+    if (maxP) listingQuery = listingQuery.lte("price_per_kg", maxP);
+    if (matchForm.certification !== "Any") listingQuery = listingQuery.eq("certification", matchForm.certification);
+    const { data: listings } = await listingQuery.order("price_per_kg", { ascending: true });
+
+    // ── Source 2: Pool contributions ───────────────────────────────────────────
+    let poolQuery = supabase
+      .from("pool_contributions")
+      .select("*, constituency_pools!inner(constituency, county, id), profiles!pool_contributions_farmer_id_fkey(name, county)")
+      .eq("status", "active")
+      .eq("variety", matchForm.variety);
+    if (maxP) poolQuery = poolQuery.lte("price_per_kg", maxP);
+    if (matchForm.county) poolQuery = poolQuery.ilike("constituency_pools.county", `%${matchForm.county}%`);
+    if (matchForm.constituency) poolQuery = poolQuery.ilike("constituency_pools.constituency", `%${matchForm.constituency}%`);
+    // Grade filter
+    const gradeMap = { A: ["A"], B: ["A","B"], C: ["A","B","C"] };
+    const allowedGrades = gradeMap[matchForm.minGrade] || ["A","B","C"];
+    poolQuery = poolQuery.in("quality_grade", allowedGrades);
+    const { data: poolContribs } = await poolQuery;
+
+    // Group pool contributions by constituency pool
+    const poolGroups = {};
+    for (const c of poolContribs || []) {
+      const poolId = c.constituency_pools?.id;
+      if (!poolId) continue;
+      if (!poolGroups[poolId]) {
+        poolGroups[poolId] = {
+          pool: c.constituency_pools, contributions: [],
+          totalKg: 0, minPrice: Infinity, maxGrade: "C"
+        };
+      }
+      poolGroups[poolId].contributions.push(c);
+      poolGroups[poolId].totalKg += Number(c.quantity_kg || 0);
+      if (Number(c.price_per_kg) < poolGroups[poolId].minPrice) poolGroups[poolId].minPrice = Number(c.price_per_kg);
+      if (gradeOrder[c.quality_grade] > gradeOrder[poolGroups[poolId].maxGrade]) poolGroups[poolId].maxGrade = c.quality_grade;
+    }
+
+    // ── Source 3: Cooperative listings ─────────────────────────────────────────
+    let coopQuery = supabase
+      .from("listings")
+      .select("*, profiles!inner(name, county, role, verified, suspended)")
+      .eq("is_active", true)
+      .eq("variety", matchForm.variety)
+      .eq("profiles.role", "cooperative")
+      .eq("profiles.verified", true)
+      .eq("profiles.suspended", false);
+    if (matchForm.county) coopQuery = coopQuery.ilike("county", `%${matchForm.county}%`);
+    if (maxP) coopQuery = coopQuery.lte("price_per_kg", maxP);
+    if (matchForm.certification !== "Any") coopQuery = coopQuery.eq("certification", matchForm.certification);
+    const { data: coopListings } = await coopQuery.order("price_per_kg", { ascending: true });
+
+    // ── Score and rank results ─────────────────────────────────────────────────
+    // Score = (can_cover_qty ? 100 : partial_coverage_pct) + grade_bonus + price_bonus
+    function scoreItem(availableKg, pricePerKg, grade) {
+      const coverage = Math.min(availableKg / qty, 1) * 60;
+      const gradeBonus = (gradeOrder[grade] || 1) * 10;
+      const priceBonus = maxP ? Math.max(0, (1 - pricePerKg / maxP) * 30) : 15;
+      return coverage + gradeBonus + priceBonus;
+    }
+
+    const individualResults = (listings || [])
+      .filter(l => l.profiles?.county && (!matchForm.county || l.profiles.county.toLowerCase().includes(matchForm.county.toLowerCase())))
+      .map(l => ({
+        type: "individual",
+        name: l.profiles?.name,
+        location: `${l.county} County`,
+        quantity_kg: Number(l.quantity_kg),
+        price_per_kg: Number(l.price_per_kg),
+        grade: "—",
+        certification: l.certification,
+        harvest_date: l.harvest_date,
+        score: scoreItem(Number(l.quantity_kg), Number(l.price_per_kg), "A"),
+        listing_id: l.id,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    const poolResults = Object.values(poolGroups)
+      .filter(g => g.totalKg > 0)
+      .map(g => ({
+        type: "pool",
+        name: `${g.pool.constituency} Pool`,
+        location: `${g.pool.county} County`,
+        quantity_kg: g.totalKg,
+        price_per_kg: g.minPrice === Infinity ? 0 : g.minPrice,
+        grade: g.maxGrade,
+        certification: "—",
+        farmer_count: g.contributions.length,
+        score: scoreItem(g.totalKg, g.minPrice === Infinity ? 0 : g.minPrice, g.maxGrade),
+        pool_id: g.pool.id,
+        constituency: g.pool.constituency,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    const coopResults = (coopListings || [])
+      .map(l => ({
+        type: "cooperative",
+        name: l.profiles?.name,
+        location: `${l.county} County`,
+        quantity_kg: Number(l.quantity_kg),
+        price_per_kg: Number(l.price_per_kg),
+        grade: "—",
+        certification: l.certification,
+        harvest_date: l.harvest_date,
+        score: scoreItem(Number(l.quantity_kg), Number(l.price_per_kg), "A"),
+        listing_id: l.id,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    setMatchResults({ individualResults, poolResults, coopResults, searchedAt: new Date() });
+  } catch (err) {
+    setMatchError("Search failed: " + err.message);
+  }
+  setLoadingMatch(false);
+}
+
+async function downloadMatchPDF(results) {
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210; const margin = 18; const cw = W - margin * 2;
+  let y = 0;
+
+  // Cover
+  doc.setFillColor(45, 122, 79);
+  doc.rect(0, 0, W, 48, "F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(22); doc.setFont("helvetica","bold");
+  doc.text("AvoConnect Smart Match Report", margin, 22);
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  doc.text(`Buyer: ${profile.name}  |  Generated: ${new Date().toLocaleDateString("en-KE", { day:"numeric", month:"long", year:"numeric" })}`, margin, 32);
+  doc.text(`Variety: ${matchForm.variety}  |  Qty needed: ${matchForm.quantity}kg  |  Max price: ${matchForm.maxPrice ? "Ksh "+matchForm.maxPrice+"/kg" : "Any"}  |  Min grade: ${matchForm.minGrade}`, margin, 40);
+  y = 60;
+
+  const totalFound = results.individualResults.length + results.poolResults.length + results.coopResults.length;
+  const totalKg = [
+    ...results.individualResults, ...results.poolResults, ...results.coopResults
+  ].reduce((s,r) => s + r.quantity_kg, 0);
+
+  doc.setTextColor(40,40,40);
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  doc.text(`Found ${totalFound} sources · ${totalKg.toLocaleString()}kg total available · ${results.searchedAt.toLocaleTimeString("en-KE")}`, margin, y); y += 14;
+
+  const sections = [
+    { title: "Individual Farmers", items: results.individualResults, icon: "🌱" },
+    { title: "Constituency Pools", items: results.poolResults, icon: "🤝" },
+    { title: "Cooperatives", items: results.coopResults, icon: "🏢" },
+  ];
+
+  for (const section of sections) {
+    if (section.items.length === 0) continue;
+    if (y > 250) { doc.addPage(); y = 20; }
+    doc.setFillColor(45,122,79);
+    doc.rect(margin, y, cw, 9, "F");
+    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("helvetica","bold");
+    doc.text(`${section.title} (${section.items.length})`, margin+3, y+6.5); y += 13;
+
+    for (const item of section.items) {
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.setTextColor(20,20,20); doc.setFontSize(10); doc.setFont("helvetica","bold");
+      doc.text(item.name, margin+2, y);
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(80,80,80);
+      doc.text(`${item.location}  ·  ${item.quantity_kg.toLocaleString()}kg  ·  Ksh ${item.price_per_kg}/kg${item.grade !== "—" ? "  ·  Grade "+item.grade : ""}${item.certification && item.certification !== "—" ? "  ·  "+item.certification : ""}${item.farmer_count ? "  ·  "+item.farmer_count+" farmers" : ""}`, margin+2, y+5.5);
+      doc.text(`To contact: Place an order or visit request through AvoConnect.`, margin+2, y+10.5);
+      doc.setDrawColor(220,220,220); doc.line(margin, y+14, margin+cw, y+14);
+      y += 17;
+    }
+    y += 4;
+  }
+
+  // Footer
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(248,248,246); doc.rect(0,284,W,13,"F");
+    doc.setTextColor(150,150,150); doc.setFontSize(8); doc.setFont("helvetica","normal");
+    doc.text("AvoConnect Smart Match  —  Confidential buyer report", margin, 291);
+    doc.text(`Page ${p} of ${totalPages}`, W-margin-18, 291);
+  }
+
+  doc.save(`AvoConnect_SmartMatch_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
   async function broadcastRequirement(e) {
   e.preventDefault();
   if (!profile.verified) { alert("Your account must be verified before broadcasting requirements."); return; }
@@ -194,6 +412,9 @@ async function closeRequirement(id) {
 </button>
 <button onClick={() => { setTab("history"); fetchHistory(); }} style={{ background: tab === "history" ? t.greenLight : "none", color: tab === "history" ? t.greenDark : t.textMuted, border: "none", padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
   🧾 My Orders & Visits
+</button>
+<button onClick={() => setTab("smartmatch")} style={{ background: tab === "smartmatch" ? t.greenLight : "none", color: tab === "smartmatch" ? t.greenDark : t.textMuted, border: "none", padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+  🎯 Smart Match
 </button>
       </div>
 
@@ -326,6 +547,134 @@ async function closeRequirement(id) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "smartmatch" && (
+        <div>
+          {/* Search form */}
+          <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 20, padding: 28, boxShadow: t.shadow, marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, marginBottom: 6 }}>🎯 Smart Match</h2>
+            <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 20 }}>Tell us what you need — we'll find the best matching farmers, pools, and cooperatives across all of AvoConnect.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Variety *</label>
+                <select value={matchForm.variety} onChange={e => setMatchForm(f => ({...f, variety: e.target.value}))} style={inp}>
+                  {["Hass","Fuerte","Jumbo","Pinkerton","Reed","Kienyeji"].map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Quantity needed (kg) *</label>
+                <input type="number" placeholder="e.g. 2000" value={matchForm.quantity} onChange={e => setMatchForm(f => ({...f, quantity: e.target.value}))} style={inp} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>County (optional)</label>
+                <input placeholder="e.g. Nakuru" value={matchForm.county} onChange={e => setMatchForm(f => ({...f, county: e.target.value}))} style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Constituency (optional)</label>
+                <input placeholder="e.g. Njoro" value={matchForm.constituency} onChange={e => setMatchForm(f => ({...f, constituency: e.target.value}))} style={inp} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Max price (Ksh/kg)</label>
+                <input type="number" placeholder="e.g. 80" value={matchForm.maxPrice} onChange={e => setMatchForm(f => ({...f, maxPrice: e.target.value}))} style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Minimum grade</label>
+                <select value={matchForm.minGrade} onChange={e => setMatchForm(f => ({...f, minGrade: e.target.value}))} style={inp}>
+                  <option value="A">Grade A only (export)</option>
+                  <option value="B">Grade B and above</option>
+                  <option value="C">Any grade</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.textMuted, display: "block", marginBottom: 4 }}>Certification</label>
+                <select value={matchForm.certification} onChange={e => setMatchForm(f => ({...f, certification: e.target.value}))} style={inp}>
+                  {["Any","None","GlobalG.A.P","KEPHIS","Organic","KS EAS 12"].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            {matchError && <p style={{ fontSize: 13, color: "#EF4444", marginBottom: 12 }}>{matchError}</p>}
+            <button onClick={runSmartMatch} disabled={loadingMatch}
+              style={{ width: "100%", padding: 13, background: t.green, color: t.white, border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: loadingMatch ? 0.7 : 1 }}>
+              {loadingMatch ? "Searching…" : "🎯 Find best matches"}
+            </button>
+          </div>
+
+          {/* Results */}
+          {matchResults && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 15 }}>
+                    {matchResults.individualResults.length + matchResults.poolResults.length + matchResults.coopResults.length} sources found
+                  </span>
+                  <span style={{ fontSize: 13, color: t.textMuted, marginLeft: 8 }}>
+                    · {[...matchResults.individualResults, ...matchResults.poolResults, ...matchResults.coopResults].reduce((s,r) => s + r.quantity_kg, 0).toLocaleString()}kg total available
+                  </span>
+                </div>
+                <button onClick={() => downloadMatchPDF(matchResults)}
+                  style={{ ...btn("none", t.green, `1px solid ${t.green}`), fontSize: 12 }}>
+                  📄 Download PDF
+                </button>
+              </div>
+
+              {[
+                { key: "individualResults", label: "🌱 Individual Farmers", color: t.greenLight, textColor: t.greenDark },
+                { key: "poolResults", label: "🤝 Constituency Pools", color: "#EDE9FE", textColor: "#5B21B6" },
+                { key: "coopResults", label: "🏢 Cooperatives", color: t.brownLight, textColor: t.brown },
+              ].map(section => matchResults[section.key].length > 0 && (
+                <div key={section.key} style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: section.textColor, background: section.color, padding: "8px 14px", borderRadius: 10, marginBottom: 10 }}>
+                    {section.label} ({matchResults[section.key].length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {matchResults[section.key].map((r, i) => (
+                      <div key={i} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 14, padding: 16, boxShadow: t.shadow }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.name}</div>
+                            <div style={{ fontSize: 12, color: t.textMuted, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                              <span>📍 {r.location}</span>
+                              <span>🧺 {r.quantity_kg.toLocaleString()}kg available</span>
+                              {r.grade !== "—" && <span>⭐ Grade {r.grade}</span>}
+                              {r.certification && r.certification !== "—" && <span>✅ {r.certification}</span>}
+                              {r.farmer_count && <span>👥 {r.farmer_count} farmers</span>}
+                              {r.harvest_date && <span>📅 {r.harvest_date}</span>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: t.greenDark }}>Ksh {r.price_per_kg}/kg</div>
+                            <div style={{ fontSize: 11, color: t.textMuted }}>
+                              {r.quantity_kg >= Number(matchForm.quantity)
+                                ? <span style={{ color: t.green, fontWeight: 600 }}>✓ Covers your full {matchForm.quantity}kg</span>
+                                : <span style={{ color: "#F59E0B", fontWeight: 600 }}>Partial: {r.quantity_kg}kg of {matchForm.quantity}kg</span>
+                              }
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 12, padding: "8px 12px", background: t.cream, borderRadius: 8, fontSize: 12, color: t.textMuted }}>
+                          🔒 To get contact details, place an order or visit request through AvoConnect.
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {matchResults.individualResults.length === 0 && matchResults.poolResults.length === 0 && matchResults.coopResults.length === 0 && (
+                <div style={{ textAlign: "center", padding: 48, background: t.white, borderRadius: 16, border: `1px solid ${t.border}` }}>
+                  <p style={{ fontSize: 32, marginBottom: 12 }}>🔍</p>
+                  <p style={{ fontWeight: 600, marginBottom: 4 }}>No matches found</p>
+                  <p style={{ color: t.textMuted, fontSize: 13 }}>Try broadening your search — lower the min grade, increase max price, or remove the county filter.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
