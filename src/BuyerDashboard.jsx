@@ -659,8 +659,21 @@ async function downloadMatchPDF(results) {
                             </div>
                           </div>
                         </div>
-                        <div style={{ marginTop: 12, padding: "8px 12px", background: t.cream, borderRadius: 8, fontSize: 12, color: t.textMuted }}>
-                          🔒 To get contact details, place an order or visit request through AvoConnect.
+                        <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: t.cream, borderRadius: 8 }}>
+                          <span style={{ fontSize: 12, color: t.textMuted }}>🔒 Contact details revealed after placing order/visit request.</span>
+                          {r.type === "pool" ? (
+                            <button
+                              onClick={() => setPage({ name: "pool", data: { pool: { id: r.pool_id, constituency: r.constituency, county: r.location.replace(" County",""), variety: matchForm.variety, total_kg: r.quantity_kg, price_per_kg: r.price_per_kg }, contributorCount: r.farmer_count || 0 } })}
+                              style={{ padding: "6px 16px", background: "#8B5CF6", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, marginLeft: 12 }}>
+                              🚜 Request visit
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setPage({ name: "listing", data: { id: r.listing_id, variety: r.name?.includes("Pool") ? matchForm.variety : matchForm.variety, quantity_kg: r.quantity_kg, price_per_kg: r.price_per_kg, harvest_date: r.harvest_date, certification: r.certification, county: r.location.replace(" County",""), farmer_id: null, profiles: { name: r.name, phone: null, county: r.location.replace(" County","") } } })}
+                              style={{ padding: "6px 16px", background: t.green, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, marginLeft: 12 }}>
+                              🛒 Order now
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
