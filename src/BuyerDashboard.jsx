@@ -218,6 +218,7 @@ async function closeRequirement(id) {
         harvest_date: l.harvest_date,
         score: scoreItem(Number(l.quantity_kg), Number(l.price_per_kg), "A"),
         listing_id: l.id,
+        fullListing: l, // store full listing so we can pass real farmer_id on order
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
@@ -252,6 +253,7 @@ async function closeRequirement(id) {
         harvest_date: l.harvest_date,
         score: scoreItem(Number(l.quantity_kg), Number(l.price_per_kg), "A"),
         listing_id: l.id,
+        fullListing: l, // store full listing so we can pass real farmer_id on order
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
@@ -669,7 +671,7 @@ async function downloadMatchPDF(results) {
                             </button>
                           ) : (
                             <button
-                              onClick={() => setPage({ name: "listing", data: { id: r.listing_id, variety: r.name?.includes("Pool") ? matchForm.variety : matchForm.variety, quantity_kg: r.quantity_kg, price_per_kg: r.price_per_kg, harvest_date: r.harvest_date, certification: r.certification, county: r.location.replace(" County",""), farmer_id: null, profiles: { name: r.name, phone: null, county: r.location.replace(" County","") } } })}
+                              onClick={() => setPage({ name: "listing", data: r.fullListing })}
                               style={{ padding: "6px 16px", background: t.green, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, marginLeft: 12 }}>
                               🛒 Order now
                             </button>
