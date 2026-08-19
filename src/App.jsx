@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+export { supabase } from "./supabase";
 import FarmDiary from "./FarmDiary";
 import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
@@ -15,10 +15,7 @@ import AdminLogin, { AdminSetPin } from "./AdminLogin";
 import ConstituencyAdminDashboard from "./ConstituencyAdminDashboard";
 
 // THIS IS THE ONLY GENERATOR IN THE PROJECT
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+export { supabase } from "./supabase";
 
 const t = {
   green: "#2D7A4F",
