@@ -14,9 +14,6 @@ import BuyerDashboard from "./BuyerDashboard";
 import AdminLogin, { AdminSetPin } from "./AdminLogin";
 import ConstituencyAdminDashboard from "./ConstituencyAdminDashboard";
 
-// THIS IS THE ONLY GENERATOR IN THE PROJECT
-export { supabase } from "./supabase";
-
 const t = {
   green: "#2D7A4F",
   greenDark: "#1A5C35",
@@ -422,8 +419,110 @@ function SidebarSection({ label }) {
   );
 }
 
+// ── Noticeboard ────────────────────────────────────────────────
+function Noticeboard({ profile }) {
+  const [notices, setNotices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [text, setText] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => { loadNotices(); }, []);
+
+  async function loadNotices() {
+    setLoading(true);
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from("noticeboard")
+      .select("*, profiles(name)")
+      .gt("created_at", cutoff)
+      .order("created_at", { ascending: false });
+    setNotices(data || []);
+    setLoading(false);
+  }
+
+  async function handlePost(e) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setPosting(true); setError("");
+    const { error: err } = await supabase.from("noticeboard").insert({
+      user_id: profile.id,
+      message: text.trim(),
+    });
+    setPosting(false);
+    if (err) { setError("Failed to post notice."); return; }
+    setText("");
+    setShowForm(false);
+    loadNotices();
+  }
+
+  function timeLeft(createdAt) {
+    const expiresAt = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000;
+    const diff = expiresAt - Date.now();
+    if (diff <= 0) return "expiring…";
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    return hrs > 0 ? `${hrs}h left` : `${mins}m left`;
+  }
+
+  return (
+    <div style={{ background: t.amberLight, borderBottom: `1px solid ${t.border}` }}>
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "14px 16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: (notices.length || showForm) ? 12 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>📌</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: t.amberDark }}>Community Noticeboard</span>
+            <span style={{ fontSize: 11, color: t.textMuted }}>· notices auto-expire after 24 hrs</span>
+          </div>
+          {profile ? (
+            <button onClick={() => setShowForm(s => !s)} style={{ ...btn(t.amberDark, "#fff"), padding: "6px 14px", fontSize: 12 }}>
+              {showForm ? "Cancel" : "+ Post notice"}
+            </button>
+          ) : (
+            <span style={{ fontSize: 12, color: t.textMuted }}>Log in to post a notice</span>
+          )}
+        </div>
+
+        {showForm && (
+          <form onSubmit={handlePost} style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <input
+              value={text}
+              onChange={e => setText(e.target.value)}
+              maxLength={200}
+              placeholder="e.g. Looking for Hass buyers in Nakuru this week…"
+              style={{ ...inp, flex: 1, minWidth: 220 }}
+            />
+            <button type="submit" disabled={posting || !text.trim()} style={{ ...btn(t.green, "#fff"), opacity: posting ? 0.6 : 1 }}>
+              {posting ? "Posting…" : "Post"}
+            </button>
+          </form>
+        )}
+        {error && <p style={{ fontSize: 12, color: "#EF4444", marginBottom: 8 }}>{error}</p>}
+
+        {!loading && notices.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {notices.map(n => (
+              <div key={n.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <span style={{ fontSize: 13, color: t.text }}>{n.message}</span>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>— {n.profiles?.name || "Someone"}</div>
+                </div>
+                <span style={{ fontSize: 11, color: t.amberDark, flexShrink: 0, background: t.amberLight, padding: "3px 8px", borderRadius: 99 }}>{timeLeft(n.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && notices.length === 0 && !showForm && (
+          <p style={{ fontSize: 12, color: t.textMuted, margin: 0 }}>No active notices right now.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Home Marketplace ───────────────────────────────────────────
-function Home({ setPage }) {
+function Home({ setPage, profile }) {
   const [listings, setListings] = useState([]);
   const [pools, setPools] = useState([]);
   const [poolCounts, setPoolCounts] = useState({});
@@ -531,6 +630,8 @@ function Home({ setPage }) {
           ))}
         </div>
       </div>
+
+            <Noticeboard profile={profile} />
 
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "32px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -1033,7 +1134,7 @@ export default function App() {
       <style>{css}</style>
       <Nav setPage={setPage} profile={profile} onSignOut={signOut} />
       <div style={{ minHeight: "calc(100vh - 62px)" }}>
-        {pageName === "home" && <Home setPage={setPage} />}
+        {pageName === "home" && <Home setPage={setPage} profile={profile} />}
         {pageName === "signup" && <Signup setPage={setPage} setProfile={setProfile} />}
         {pageName === "login" && <Login setPage={setPage} setProfile={setProfile} />}
         {pageName === "admin-login" && <AdminLogin setPage={setPage} setProfile={setProfile} />}
