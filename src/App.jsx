@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-export { supabase } from "./supabase";
+import { supabase } from "./supabase";
+export { supabase };
 import FarmDiary from "./FarmDiary";
 import AdminPage from "./AdminPage";
 import ReviewModal from "./ReviewModal";
