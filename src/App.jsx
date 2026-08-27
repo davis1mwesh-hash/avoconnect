@@ -427,6 +427,7 @@ function Noticeboard({ profile }) {
   const [posting, setPosting] = useState(false);
   const [text, setText] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => { loadNotices(); }, []);
@@ -438,7 +439,8 @@ function Noticeboard({ profile }) {
       .from("noticeboard")
       .select("*, profiles(name)")
       .gt("created_at", cutoff)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(20);
     setNotices(data || []);
     setLoading(false);
   }
@@ -467,22 +469,31 @@ function Noticeboard({ profile }) {
     return hrs > 0 ? `${hrs}h left` : `${mins}m left`;
   }
 
+  const latest = notices[0];
+
   return (
     <div style={{ background: t.amberLight, borderBottom: `1px solid ${t.border}` }}>
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "14px 16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: (notices.length || showForm) ? 12 : 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: showForm ? 12 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 16 }}>📌</span>
             <span style={{ fontWeight: 600, fontSize: 14, color: t.amberDark }}>Community Noticeboard</span>
             <span style={{ fontSize: 11, color: t.textMuted }}>· notices auto-expire after 24 hrs</span>
           </div>
-          {profile ? (
-            <button onClick={() => setShowForm(s => !s)} style={{ ...btn(t.amberDark, "#fff"), padding: "6px 14px", fontSize: 12 }}>
-              {showForm ? "Cancel" : "+ Post notice"}
-            </button>
-          ) : (
-            <span style={{ fontSize: 12, color: t.textMuted }}>Log in to post a notice</span>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {notices.length > 0 && (
+              <button onClick={() => setShowAll(true)} style={{ background: "none", border: "none", color: t.amberDark, fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                View all notices ({notices.length})
+              </button>
+            )}
+            {profile ? (
+              <button onClick={() => setShowForm(s => !s)} style={{ ...btn(t.amberDark, "#fff"), padding: "6px 14px", fontSize: 12 }}>
+                {showForm ? "Cancel" : "+ Post notice"}
+              </button>
+            ) : (
+              <span style={{ fontSize: 12, color: t.textMuted }}>Log in to post a notice</span>
+            )}
+          </div>
         </div>
 
         {showForm && (
@@ -501,23 +512,41 @@ function Noticeboard({ profile }) {
         )}
         {error && <p style={{ fontSize: 12, color: "#EF4444", marginBottom: 8 }}>{error}</p>}
 
-        {!loading && notices.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {notices.map(n => (
-              <div key={n.id} style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                <div>
-                  <span style={{ fontSize: 13, color: t.text }}>{n.message}</span>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>— {n.profiles?.name || "Someone"}</div>
-                </div>
-                <span style={{ fontSize: 11, color: t.amberDark, flexShrink: 0, background: t.amberLight, padding: "3px 8px", borderRadius: 99 }}>{timeLeft(n.created_at)}</span>
-              </div>
-            ))}
+        {!loading && latest && (
+          <div style={{ background: t.white, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div>
+              <span style={{ fontSize: 13, color: t.text }}>{latest.message}</span>
+              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>— {latest.profiles?.name || "Someone"}</div>
+            </div>
+            <span style={{ fontSize: 11, color: t.amberDark, flexShrink: 0, background: t.amberLight, padding: "3px 8px", borderRadius: 99 }}>{timeLeft(latest.created_at)}</span>
           </div>
         )}
         {!loading && notices.length === 0 && !showForm && (
           <p style={{ fontSize: 12, color: t.textMuted, margin: 0 }}>No active notices right now.</p>
         )}
       </div>
+
+      {showAll && (
+        <div onClick={() => setShowAll(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: t.white, borderRadius: 20, maxWidth: 520, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 60px rgba(0,0,0,.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+              <h3 className="serif" style={{ fontSize: 18 }}>📌 All Notices ({notices.length})</h3>
+              <button onClick={() => setShowAll(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.textMuted }}>✕</button>
+            </div>
+            <div style={{ overflowY: "auto", padding: "16px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {notices.map(n => (
+                <div key={n.id} style={{ background: t.cream, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <div>
+                    <span style={{ fontSize: 13, color: t.text }}>{n.message}</span>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>— {n.profiles?.name || "Someone"}</div>
+                  </div>
+                  <span style={{ fontSize: 11, color: t.amberDark, flexShrink: 0, background: t.amberLight, padding: "3px 8px", borderRadius: 99 }}>{timeLeft(n.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
