@@ -772,6 +772,18 @@ function ListingDetail({ listing: l, setPage, profile }) {
         </div>
         <div style={{ padding: 24 }}>
           {l.description && <p style={{ fontSize: 14, color: t.textMuted, marginBottom: 20, lineHeight: 1.7, padding: "14px 16px", background: t.cream, borderRadius: 10 }}>{l.description}</p>}
+                    {l.latitude && l.longitude && (
+            <div style={{ marginBottom: 20, borderRadius: 10, overflow: "hidden", border: `1px solid ${t.border}` }}>
+              <iframe
+                title="Farm location"
+                width="100%" height="220" style={{ border: 0, display: "block" }}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${l.longitude - 0.01}%2C${l.latitude - 0.01}%2C${l.longitude + 0.01}%2C${l.latitude + 0.01}&layer=mapnik&marker=${l.latitude}%2C${l.longitude}`}
+              />
+              <a href={`https://www.openstreetmap.org/?mlat=${l.latitude}&mlon=${l.longitude}#map=15/${l.latitude}/${l.longitude}`} target="_blank" rel="noreferrer" style={{ display: "block", textAlign: "center", padding: "8px", fontSize: 12, color: t.greenDark, background: t.greenLight }}>
+                Open in full map ↗
+              </a>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
             {[["🧺 Available", `${l.quantity_kg?.toLocaleString()} kg`], ["📅 Harvest", l.harvest_date], ["✅ Certification", l.certification], ["📞 Contact", l.profiles?.phone]].map(([k, v]) => (
               <div key={k} style={{ background: t.cream, borderRadius: 10, padding: "12px 14px", border: `1px solid ${t.border}` }}>
@@ -1041,6 +1053,18 @@ function ListForm({ setPage, profile }) {
   const [error, setError] = useState("");
   const [pooled, setPooled] = useState(false);
   const [qualityGrade, setQualityGrade] = useState("A");
+    const [coords, setCoords] = useState(null);
+  const [locStatus, setLocStatus] = useState("");
+
+  function captureLocation() {
+    if (!navigator.geolocation) { setLocStatus("Location not supported on this device."); return; }
+    setLocStatus("Getting your location…");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocStatus("📍 Location captured");
+      },
+      () =>
   const POOL_THRESHOLD = 500;
 
   async function handleSubmit(e) {
@@ -1079,7 +1103,8 @@ function ListForm({ setPage, profile }) {
 
     const { error: err } = await supabase.from("listings").insert({
       farmer_id: profile.id, variety, quantity_kg: quantity, price_per_kg: Number(price),
-      harvest_date: date, certification: cert, description: desc, county: profile.county, is_active: true
+      harvest_date: date, certification: cert, description: desc, county: profile.county, is_active: true,
+      latitude: coords?.lat || null, longitude: coords?.lng || null,
     });
     setLoading(false);
     if (err) { setError("Failed to list crop lot. Try again."); return; }
@@ -1123,6 +1148,13 @@ function ListForm({ setPage, profile }) {
           </div>
           <div><label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Estimated Harvest Window</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} /></div>
+                      <div>
+            <label style={{ fontSize: 12, color: t.textMuted, display: "block", marginBottom: 4, fontWeight: 500 }}>Farm location (optional)</label>
+            <button type="button" onClick={captureLocation} style={{ ...btn(coords ? t.greenLight : t.cream, coords ? t.greenDark : t.text, `1.5px solid ${t.border}`), width: "100%", padding: "11px 14px", fontSize: 13 }}>
+              📍 {coords ? "Location captured — tap to redo" : "Use my current location"}
+            </button>
+            {locStatus && <p style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>{locStatus}</p>}
+          </div>
           {profile.role === "farmer" && qty && Number(qty) < 500 && (
             <>
               <div style={{ padding: "10px 14px", background: "#EDE9FE", borderRadius: 8 }}>
