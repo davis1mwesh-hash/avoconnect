@@ -1055,7 +1055,6 @@ function ListForm({ setPage, profile }) {
   const [qualityGrade, setQualityGrade] = useState("A");
     const [coords, setCoords] = useState(null);
   const [locStatus, setLocStatus] = useState("");
-
   function captureLocation() {
     if (!navigator.geolocation) { setLocStatus("Location not supported on this device."); return; }
     setLocStatus("Getting your location…");
@@ -1064,7 +1063,10 @@ function ListForm({ setPage, profile }) {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocStatus("📍 Location captured");
       },
-      () =>
+      () => setLocStatus("Could not get location. Check permissions and try again."),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
   const POOL_THRESHOLD = 500;
 
   async function handleSubmit(e) {
