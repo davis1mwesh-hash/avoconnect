@@ -14,6 +14,7 @@ import FarmerDashboard from "./FarmerDashboard";
 import BuyerDashboard from "./BuyerDashboard";
 import AdminLogin, { AdminSetPin } from "./AdminLogin";
 import ConstituencyAdminDashboard from "./ConstituencyAdminDashboard";
+import heroImg from "./assets/hero-avocado.jpg";
 
 const t = {
   green: "#2D7A4F",
@@ -621,9 +622,14 @@ function Home({ setPage, profile }) {
 
   return (
     <div>
-      <div style={{ background: `linear-gradient(135deg, ${t.greenDark} 0%, ${t.green} 60%, ${t.greenMid} 100%)`, padding: "56px 24px 48px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -40, right: -40, width: 300, height: 300, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
-        <div style={{ position: "absolute", bottom: -60, left: -20, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
+      <div style={{
+        background: `linear-gradient(90deg, rgba(26,92,53,0.93) 0%, rgba(26,92,53,0.8) 40%, rgba(26,92,53,0.4) 75%, rgba(26,92,53,0.15) 100%), url(${heroImg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center right",
+        padding: "56px 24px 48px",
+        position: "relative",
+        overflow: "hidden"
+      }}>
         <div style={{ maxWidth: 640, margin: "0 auto", position: "relative" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, background: "rgba(255,255,255,.15)", color: "#fff", padding: "5px 14px", borderRadius: 99, marginBottom: 20, letterSpacing: ".5px" }}>
             🌍 Connecting Kenya's avocado farmers & buyers
