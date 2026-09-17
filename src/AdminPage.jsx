@@ -91,12 +91,11 @@ function PendingTab({ onAction }) {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("verification_status", "pending")
-      .order("created_at", { ascending: true });
-    setPending(data || []);
+    const { data, error } = await supabase.rpc("get_pending_verifications", {
+      p_admin_id: profile.id,
+      p_admin_pin: profile.pin,
+    });
+    setPending(error ? [] : (data || []));
     setLoading(false);
   }
 
@@ -202,7 +201,7 @@ function UsersTab() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("*, reviews_received:reviews!reviews_reviewee_id_fkey(rating)")
+      .select("id, name, phone, role, county, constituency, buyer_type, verified, created_at, verification_status, strikes, suspended, trust_score, total_ratings, company_name, company_website, company_description, reg_number, kra_pin, member_count, email, reviews_received:reviews!reviews_reviewee_id_fkey(rating)")
       .order("created_at", { ascending: false });
     setUsers(data || []);
     setLoading(false);
@@ -1293,7 +1292,7 @@ function SubAdminsTab() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("*")
+      .select("id, name, phone, role, admin_role, assigned_constituency, county, suspended, created_at")
       .eq("role", "admin")
       .eq("admin_role", "constituency")
       .order("created_at", { ascending: false });
@@ -1437,7 +1436,7 @@ export default function AdminPage({ profile }) {
         ))}
       </div>
 
-      {tab === "pending"   && <PendingTab onAction={loadPendingCount} />}
+      {tab === "pending"   && <PendingTab onAction={loadPendingCount} profile={profile} />}
       {tab === "users"     && <UsersTab />}
       {tab === "no_shows"  && <NoShowsTab />}
       {tab === "resources" && <ResourcesTab />}

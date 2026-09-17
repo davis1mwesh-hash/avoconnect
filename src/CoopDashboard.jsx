@@ -59,8 +59,11 @@ export default function CoopDashboard({ profile, setPage }) {
       .from("cooperatives").select("*").eq("admin_id", profile.id).maybeSingle();
     if (coopData) {
       setCooperative(coopData);
-      const { data: memData } = await supabase
-        .from("cooperative_members").select("*").eq("cooperative_id", coopData.id).order("created_at", { ascending: false });
+      const { data: memData } = await supabase.rpc("get_cooperative_members", {
+        p_admin_id: profile.id,
+        p_admin_pin: profile.pin,
+        p_cooperative_id: coopData.id,
+      });
       setMembers(memData || []);
     }
     setLoading(false);

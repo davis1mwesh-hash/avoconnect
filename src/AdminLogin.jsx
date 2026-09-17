@@ -72,15 +72,17 @@ export default function AdminLogin({ setPage, setProfile }) {
     e.preventDefault();
     if (!phone || !pin) { setError("Enter your phone number and PIN."); return; }
     setLoading(true); setError("");
-    const { data, error: err } = await supabase.from("profiles").select("*").eq("phone", phone).maybeSingle();
+    const { data, error: err } = await supabase.rpc("verify_login", { p_phone: phone, p_pin: pin });
     setLoading(false);
-    if (err || !data) { setError("No account found matching that number."); return; }
-    if (data.role !== "admin") { setError("This account is not authorized for admin access."); return; }
-    if (!data.pin || data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
-    if (data.must_reset_pin) { setPage({ name: "admin-set-pin", data }); return; }
-    setProfile(data);
-    if (data.admin_role === "super") setPage("admin");
-    else if (data.admin_role === "constituency") setPage("constituency-dashboard");
+    if (err) { setError("Something went wrong. Please try again."); return; }
+    if (data.status === "not_found") { setError("No account found matching that number."); return; }
+    if (data.status === "wrong_pin" || data.status === "needs_pin") { setError("Incorrect PIN. Please try again."); return; }
+    const profile = data.profile;
+    if (profile.role !== "admin") { setError("This account is not authorized for admin access."); return; }
+    if (profile.must_reset_pin) { setPage({ name: "admin-set-pin", data: profile }); return; }
+    setProfile(profile);
+    if (profile.admin_role === "super") setPage("admin");
+    else if (profile.admin_role === "constituency") setPage("constituency-dashboard");
     else { setError("Admin role not configured. Contact super admin."); }
   }
 

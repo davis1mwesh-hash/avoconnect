@@ -991,16 +991,18 @@ function Login({ setPage, setProfile }) {
     e.preventDefault();
     if (!phone || !pin) { setError("Enter your phone number and PIN."); return; }
     setLoading(true); setError("");
-    const { data, error: err } = await supabase.from("profiles").select("*").eq("phone", phone).maybeSingle();
+    const { data, error: err } = await supabase.rpc("verify_login", { p_phone: phone, p_pin: pin });
     setLoading(false);
-    if (err || !data) { setError("No active profile found matching that number."); return; }
-    if (!data.pin) { setPage({ name: "set-pin", data }); return; }
-if (data.pin !== pin) { setError("Incorrect PIN. Please try again."); return; }
-    if (data.role === "admin") { setError("Admin accounts must use the admin login."); return; }
-    setProfile(data);
-    if (data.role === "company") setPage("company-dashboard");
-    else if (data.role === "cooperative") setPage("coop-dashboard");
-    else if (data.role === "buyer") setPage("home");
+    if (err) { setError("Something went wrong. Please try again."); return; }
+    if (data.status === "not_found") { setError("No active profile found matching that number."); return; }
+    if (data.status === "needs_pin") { setPage({ name: "set-pin", data: data.profile }); return; }
+    if (data.status === "wrong_pin") { setError("Incorrect PIN. Please try again."); return; }
+    const profile = data.profile;
+    if (profile.role === "admin") { setError("Admin accounts must use the admin login."); return; }
+    setProfile(profile);
+    if (profile.role === "company") setPage("company-dashboard");
+    else if (profile.role === "cooperative") setPage("coop-dashboard");
+    else if (profile.role === "buyer") setPage("home");
     else setPage("dashboard");
   }
 

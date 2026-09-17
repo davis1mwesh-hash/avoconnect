@@ -112,7 +112,7 @@ function PoolOverviewTab({ constituency }) {
 }
 
 // ── Pending Farmer Registrations Tab ─────────────────────────────
-function PendingFarmersTab({ constituency }) {
+function PendingFarmersTab({ constituency, profile }) {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState({});
@@ -122,14 +122,11 @@ function PendingFarmersTab({ constituency }) {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "farmer")
-      .eq("constituency", constituency)
-      .eq("verification_status", "pending")
-      .order("created_at", { ascending: true });
-    setPending(data || []);
+    const { data, error } = await supabase.rpc("get_pending_verifications", {
+      p_admin_id: profile.id,
+      p_admin_pin: profile.pin,
+    });
+    setPending(error ? [] : (data || []));
     setLoading(false);
   }
 
@@ -481,7 +478,7 @@ export default function ConstituencyAdminDashboard({ profile }) {
 
       {tab === "pool"     && <PoolOverviewTab constituency={constituency} />}
       {tab === "visits"   && <VisitRequestsTab constituency={constituency} />}
-      {tab === "pending"  && <PendingFarmersTab constituency={constituency} />}
+      {tab === "pending"  && <PendingFarmersTab constituency={constituency} profile={profile} />}
       {tab === "contribs" && <ContributionsTab constituency={constituency} />}
     </div>
   );
